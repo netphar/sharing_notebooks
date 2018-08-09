@@ -1,5 +1,5 @@
 ---
-title: "plot_synergy"
+title: "9Aug"
 output: html_document
 ---
 
@@ -17,4 +17,11 @@ df <- data.frame(x = input$blockIDs, y = input$Synergy_ZIP)
 df_no_dups <- df[!duplicated(df), ] #removing all NA and 0 for synergy (?)
 df <- data.frame(x = df_no_dups$x, y = df_no_dups$y)
 ggplot(df,aes(x=x,y=y)) + geom_point(alpha = 0.3)
+```
+to filter stuff (need dplyr)`
+```{r}
+read.csv('output_alls.csv') -> outputall
+result <- outputall %>%
+     filter(outputall$drug.row=='MRK-003' & outputall$drug.col=='Vinblastine' & outputall$cell_line=='COLO320DM')
+length(which(is.na(outputall$Response_inhibition))) #search for na in a given column
 ```
