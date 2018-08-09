@@ -1,0 +1,20 @@
+---
+title: "plot_synergy"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+loading libs
+```{r}
+library('tidyverse')
+```
+preping the df to be plotted
+```{r}
+input <- read.csv('output_alls.csv')
+df <- data.frame(x = input$blockIDs, y = input$Synergy_ZIP)
+df_no_dups <- df[!duplicated(df), ] #removing all NA and 0 for synergy (?)
+df <- data.frame(x = df_no_dups$x, y = df_no_dups$y)
+ggplot(df,aes(x=x,y=y)) + geom_point(alpha = 0.3)
+```
