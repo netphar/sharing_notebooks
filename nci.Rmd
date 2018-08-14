@@ -1,0 +1,329 @@
+---
+title: "nci_Aug"
+output: html_notebook
+---
+##### setting up 
+```{r}
+library("tidyverse")
+setwd('/Users/zagidull/Documents/fimm_files/synergy_calc_august/almanac')
+```
+
+##### reading in the data
+```{r}
+nov2017 <- read_csv('ComboDrugGrowth_Nov2017.csv', progress = F) # it is nice to read as tibble, this helps get rid of formatting errors
+nov2017$TESTDATE <- as.Date(nov2017$TESTDATE,"%m/%d/%Y") #correcting DATA col class
+sapply(nov2017, class) #to check for correctedness of setting the classes
+```
+
+##### sort by screener and remove NCI
+
+`A total of 5,232 drug pairs were evaluated in each of the cell lines; 304,549 experiments were performed to test each drug at either 9 or 15 combination dose points, for a total of 2,809,671 dose combinations`
+
+##### here we take one cell line and prepare it for processing. 
+```{r}
+for_sorting <- nov2017
+
+for_sorting_one <- for_sorting %>% # taking one cell line as an example
+  filter(CELLNAME=='786-0')
+
+saveRDS(for_sorting_one,"for_sorting_one" )
+```
+
+##### starting work. As a result there are two files: singles and combos, where singles have single drugs testd. Combos are obv drug pairs
+```{r}
+for_sorting_one$groupID <- for_sorting_one %>% 
+  group_by(NSC1,NSC2) %>%
+    group_indices(.)
+
+for_sorting_one <- for_sorting_one %>%
+  group_by(groupID)
+
+before <- colnames(for_sorting_one)
+for_sorting_one <- for_sorting_one[vapply(for_sorting_one, function(x) length(unique(x)) > 1, logical(1L))] # drop all columns with a single unique value
+
+
+for_sorting_one <- for_sorting_one[,-c(22,21,20,19,18,17)] # drop useless 
+for_sorting_one <- for_sorting_one[, -c(17)]
+after <- colnames(for_sorting_one)
+
+dropped <- setdiff(before, after)
+
+singles <- for_sorting_one %>% # this is for al lthe cases when only a single drug was tested
+  filter(CONCINDEX2 == 0)
+
+combos <- for_sorting_one %>% # this is for al lthe cases when two drugs were tested
+  filter(CONCINDEX2 != 0)
+```
+
+##### we need to make sure that we have the same drugID (NSC numbers) in both singles and combos
+```{r}
+setdiff(singles$NSC1, combos$NSC1)
+NSC_to_drop <- setdiff(singles$NSC1, combos$NSC1)
+# lets get rid of the NSC that was tested only as single
+singles <- singles[-which(singles$NSC1 == NSC_to_drop),]
+print(setdiff(singles$NSC1, combos$NSC1))
+for_syn_calc <- rbind(singles, combos)
+saveRDS(for_syn_calc, "for_syn_calc")
+
+```
+##### now let's group by NSC1 to do the reshape and synergy calc
+```{r}
+nrow(for_syn_calc)
+for_syn_calc <- for_syn_calc[-which(is.na(for_syn_calc$PREFIX2)), ] # because all values from the ALMANAC study have prefix S
+nrow(for_syn_calc)
+
+for_syn_calc$groups <- for_syn_calc %>% # i m not sure what s the point of doing that anymore. I dont really need that in R. It is here in case of applying python add_col_row.py
+  group_by(NSC1) %>%
+    group_indices(.)
+for_syn_calc <- for_syn_calc %>%
+  group_by(groups) %>%
+    mutate(num_rows = n()) %>%
+      arrange(groups)
+      
+
+for_syn_calc <- for_syn_calc[vapply(for_syn_calc, function(x) length(unique(x)) > 1, logical(1L))] # removing vars that have one single unique value throughout the whole dataset
+
+test <- for_syn_calc %>%
+  group_by(groups) %>%
+      group_by(CONCINDEX1,CONC1, CONC2, NSC1, NSC2) %>%
+        mutate(mean_single = mean(PERCENTGROWTH)) %>% # this gets mean values for all the experiments where one drug is tested by itself in cell line == 786-0
+          arrange(groups)
+
+test2 <- test[!duplicated(test[c("NSC1","CONC1", "CONC2", "mean_single")]),] # i don't need to have duplicated rows (if these are indeed duplicated experiments) after doing mutate(mean_single=...)
+test5 <- test2[,-c(15,16,2,3,4,5)] # dropping useless columns
+
+test6 <- test5 %>%
+  ungroup() %>%
+  mutate(NSC1,NSC2) %>%
+  select(NSC1, NSC2) %>%
+     unique # this gives a list of unique combinations whereby each combination should result in a separate group for synergyfinder::reshape()
+```
+
+##### this is a graveyard of ideas. Lasciate ogni speranza voi ch'entrante
+```{r}
+
+test7 <- test6[test6$NSC1==752,]
+test7 %>%
+  rowwise() %>%
+    filter((test5$NSC1 == NSC1 & is.na(test5$NSC2)) | (test5$NSC1 == NSC2 & is.na(test5$NSC1)) | (test5$NSC1 == NSC2 & test5$NSC2 == NSC1) | (test5$NSC1 == NSC1 & test5$NSC2 == NSC2))
+    
+
+
+
+test3 <- test2 %>%
+  filter((NSC1 == 752 & NSC2 ==3088) | (NSC1 == 752 & is.na(NSC2)) | (NSC1 == 3088 & is.na(NSC2)) | (NSC1 == 3088 & NSC2 ==752))
+
+test4 <- test3[,-c(1,2,3,4,5,7,11,16)]
+
+
+
+
+
+
+test1 <- for_syn_calc %>%
+  group_by(groups) %>%
+    filter(CONCINDEX2 == 0) %>%
+      group_by(CONCINDEX1, NSC1) %>%
+        mutate(mean_single = mean(PERCENTGROWTH))
+
+
+
+
+out <- for_syn_calc %>%
+  filter((NSC1 == 752 & NSC2 ==3088) | (NSC1 == 752 & is.na(NSC2)) | (NSC1 == 3088 & is.na(NSC2)) | (NSC1 == 3088 & NSC2 ==752))
+out <- out[vapply(out, function(x) length(unique(x)) > 1, logical(1L))]
+out <- out[, -c(22,19,18,17,16)] # in case not dropping in the previous block of code
+
+out_mean <- out %>%
+#  group_by(groupID) %>%
+ #   filter(groupID != 134) %>%
+      filter((CONCINDEX1 == 1 & CONCINDEX2 == 0 )| (CONCINDEX1 == 2 & CONCINDEX2 == 0 ) | (CONCINDEX1 == 3 & CONCINDEX2 == 0 ) |  (CONCINDEX2 != 0 )) %>%
+        group_by(NSC1, NSC2,CONCINDEX1,CONC1, CONC2) %>%
+#          group_by(groupID) %>%
+            transmute(mean_single = mean(PERCENTGROWTH)) 
+
+out_mean %>% 
+  group_by(groupID, NSC1, CONC1, CONC2) %>%
+    transmute(mean_single)
+
+for_syn_calc %>%
+  group_by(groups) %>%
+    summarise(unique(NSC1), unique(NSC2) )
+```
+
+
+##### Per me si va ne la citta dolente
+
+
+```{r}
+for_sorting_one$combo <- for_sorting_one %>%
+  group_by(CONCINDEX2) %>%
+    group_indices(.)
+
+
+singles$combo <- singles %>% #here combo becomes groupID
+  group_by(NSC1) %>%
+    group_indices(.)
+
+singles <- singles %>%
+   group_by(combo)%>%
+      mutate(num_rows = n())
+
+
+for_sorting$groupID <- for_sorting %>% # each drug pair tested in each of the cell lines
+  group_by(CELLNAME) %>%
+    group_indices(.)
+
+
+
+
+for_sorting <- for_sorting %>%
+  group_by(CELLNAME) %>%
+    mutate(num_rows = n())
+
+six <- for_sorting %>%
+  filter(num_rows == 6)
+three <- for_sorting %>%
+  filter(num_rows == 3)
+nine <- for_sorting %>%
+  filter(num_rows == 9)
+
+test <- for_sorting %>% #this plate has both single drug in 5 doses and drug combo
+    filter(NSC1 == 752 & NSC2 == 3088 & CELLNBR == 18)
+
+
+for_sorting[!is.na(for_sorting$PERCENTGROWTH),]
+```
+
+
+
+##### per me si va ne l'etterno dolore,
+
+##### prep for all where there is a complete 3x3 matrix with no NA. todo: try complete.case instad of na.omit
+```{r}
+noNA_all_rows <- nov2017 %>%
+  na.omit() %>%
+    group_by(NSC1, NSC2, SCREENER, PLATE, CELLNBR) %>%
+      summarise(number = n()) # there are 300091 different groups
+
+noNA_grouped <-nov2017 %>%
+  na.omit() %>%
+    group_by(NSC1, NSC2, PLATE, CELLNBR) %>% # there are 2700819 rows all having 3x3 matrices. Ok first set of cals
+      
+noNA_grouped$index <- noNA_grouped %>%  
+  group_indices(.) # attach index column with index ID
+```
+##### per me si va tra la perduta gente
+
+##### testing
+```{r}
+onegroup <- noNA_grouped %>%
+  filter(index==1)
+```
+##### Giustizia mosse il mio alto fattore:
+
+##### fucjuing around. Selecting on per-screener basis. Because in some 3x3 was tested, in others 5x3
+```{r}
+try_sort <- nov2017 # trying to figure out an effective screener way
+try_sort$groups <- try_sort %>% #adding groups based on panelnbr, drug1, drug2, plateID and screener institute
+  group_by(PANELNBR, NSC1, NSC2, PLATE, SCREENER, CELLNBR) %>%
+    group_indices(.)
+try_sort <- try_sort %>% # adding row count
+  group_by(groups) %>%
+    mutate(num_rows = n())
+print(try_sort[(try_sort$SCREENER == "FG" & try_sort$CELLNBR==18 & try_sort$NSC1 == 752 & try_sort$CELLNAME == "786-0" & try_sort$PANELNBR == 9 & try_sort$PANEL == 'Renal Cancer'), ], n = 395)
+
+
+withNA <- try_sort %>% # technically all drug combs have to have either 3x3 or 3x5 doses. So each not like that has NA as one of the values
+  filter(num_rows !=9 & num_rows != 15)
+noNA <- try_sort %>% # technically all drug combs have to have either 3x3 or 3x5 doses. NO na. Wait, so this has only num_rows == 9. Interesting. So 15 is not necessary that s a bit annoying coz there should be 
+  filter(num_rows ==9 | num_rows == 3)
+
+noNA_clean <- noNA[,-c(1,2,3,4,5,6,7,8,10,14,16,22,23,24,25,26,27,28,29)]
+```
+##### fecemi la divina potestate
+
+##### let's do the reshaping
+```{r}
+library(synergyfinder)
+
+```
+
+##### la somma sapienza e 'l primo amore. 
+
+##### this is more playing
+```{r}
+
+screener_select <- nov2017 # make copy
+screener_select$by_screener <- nov2017 %>% #group_by screener and add indices
+  group_by(SCREENER) %>%
+    group_indices(.) 
+
+all_rows_noNA <- all_rows %>%
+  na.omit() 
+
+all_rows_noNA$groups <- all_rows_noNA%>%
+    group_by(NSC1, NSC2, SCREENER, PLATE, CELLNBR)%>%
+      group_indices(.)
+  
+all_rows_noNA <- all_rows_noNA %>% # adding row count
+  group_by(groups) %>%
+    mutate(num_rows = n())
+
+try_one_more <- nov2017
+try_one_more$groups <- try_one_more %>% #adding groups based on panelnbr, drug1, drug2, plateID and screener institute
+  group_by(NSC1, NSC2, PLATE, PANELNBR, CELLNBR ,SCREENER) %>%
+    group_indices(.)
+try_one_more <- try_one_more %>% # adding row count
+  group_by(groups) %>%
+    mutate(num_rows = n())
+noNA_more <- try_one_more %>% # technically all drug combs have to have either 3x3 or 3x5 doses. NO na. Wait, so this has only num_rows == 9. Interesting
+  filter(num_rows ==9)
+unique(try_one_more$num_rows)
+
+plate2998 <- try_sort %>% #this plate has both single drug in 5 doses and drug combo
+  filter(PLATE == 2998) %>%
+    filter(NSC1 == 256439 & NSC2 == 747972)
+
+
+oneA <- screener_select %>% #select one screener lab
+  filter(screener_select$by_screener==1) 
+
+plate8137 <- oneA %>% #this plate has both single drug in 5 doses and drug combo
+  filter(PLATE == 8137) %>%
+    group_by(PANELNBR, NSC1, NSC2, PLATE, SCREENER)
+
+cleanup_plate8137 <- plate8137[,-c(1,2,3,4,5,8,13,19,23,24,25)] #remove not used atm columns
+
+  
+FF <- screener_select %>%
+  filter(screener_select$by_screener==2)
+FG <- screener_select %>%
+  filter(screener_select$by_screener==3)
+```
+##### Dinanzi a me non fuor cose create
+
+##### something
+```{r}
+result <- nov2017 %>%
+      filter(nov2017$NSC1==740 & nov2017$PLATE=="01_21" & nov2017$CELLNBR=='6' & is.na(nov2017$NSC2)) # is drugA, drugB and cellline enough to uniquely identify the combination? A: seems like it
+result1 <- nov2017 %>%
+      filter(nov2017$SAMPLE1==740 & ?pnov2017$NSC2==369100 & nov2017$CELLNAME=='NCI-H522') 
+
+result1 <- nov2017 %>%
+      filter(nov2017$COMBODRUGSEQ=='260496') 
+
+nov2017[c(1:27),] -> nov2017short
+result_tib <- as_tibble(nov2017short)
+grouped_result <- nov2017 %>%
+  group_by(PLATE, NSC1, NSC2) 
+
+number_of_rows <- nov2017 %>%
+  group_by(NSC1, NSC2,CELLNAME, PLATE) %>%
+    summarise(number = n()) 
+
+NSC2NA <- number_of_rows %>%
+  filter(is.na(NSC2))
+fourrow <- number_of_rows %>%
+  filter(number==4)
+```
