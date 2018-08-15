@@ -5,6 +5,7 @@ output: html_notebook
 ##### setting up 
 ```{r}
 library("tidyverse")
+library("synergyfinder")
 setwd('/Users/zagidull/Documents/fimm_files/synergy_calc_august/almanac')
 ```
 
@@ -83,21 +84,89 @@ for_syn_calc <- for_syn_calc %>%
 
 for_syn_calc <- for_syn_calc[vapply(for_syn_calc, function(x) length(unique(x)) > 1, logical(1L))] # removing vars that have one single unique value throughout the whole dataset
 
-test <- for_syn_calc %>%
+withMeanGrowth <- for_syn_calc %>%
   group_by(groups) %>%
       group_by(CONCINDEX1,CONC1, CONC2, NSC1, NSC2) %>%
         mutate(mean_single = mean(PERCENTGROWTH)) %>% # this gets mean values for all the experiments where one drug is tested by itself in cell line == 786-0
           arrange(groups)
 
-test2 <- test[!duplicated(test[c("NSC1","CONC1", "CONC2", "mean_single")]),] # i don't need to have duplicated rows (if these are indeed duplicated experiments) after doing mutate(mean_single=...)
-test5 <- test2[,-c(15,16,2,3,4,5)] # dropping useless columns
+withMeanGrowth_noDups <- withMeanGrowth[!duplicated(withMeanGrowth[c("NSC1","CONC1", "CONC2", "mean_single")]),] # i don't need to have duplicated rows (if these are indeed duplicated experiments) after doing mutate(mean_single=...)
 
-test6 <- test5 %>%
+#so test and test2 are identical in terms of unqiue info, but test2 has all the duplicated rows dropped. Here are there (FYI)
+dropped_for786_0 <- setdiff(withMeanGrowth,withMeanGrowth_noDups)
+
+withMeanGrowth_noDups_cleanedCols <- withMeanGrowth_noDups[,-c(15,16,2,3,4,5)] # dropping useless columns
+
+uniqueDrug1Drub2Combos <- withMeanGrowth_noDups_cleanedCols %>%
   ungroup() %>%
   mutate(NSC1,NSC2) %>%
   select(NSC1, NSC2) %>%
      unique # this gives a list of unique combinations whereby each combination should result in a separate group for synergyfinder::reshape()
 ```
+##### testing transformation
+```{r}
+oneComboTest_740_3053 <- withMeanGrowth_noDups %>%
+  filter((NSC1 == 740 & NSC2 ==3053) | (NSC1 == 740 & is.na(NSC2)) | (NSC1 == 3053 & is.na(NSC2)) | (NSC1 == 3053 & NSC2 ==740))
+
+rowInsert <- function(x){ #adding zero row
+  class_old <- sapply(x, class)
+#  print(class_old)
+  NSC2_un <- unique(x$NSC2[!is.na(x$NSC2)])
+  
+  predicate <- function(x) {
+    if (x[["CONCINDEX2"]]== 0 & x[["NSC1"]] == NSC2_un) {
+      return(T)
+    }
+    else {return(F)}
+  }
+  
+  exchange <- function(x) {
+    if (predicate(x)){
+    placeholderIndex <- x[["CONCINDEX1"]]
+    placeholderConc <- x[["CONC1"]]
+    x[["CONCINDEX1"]] <- x[["CONCINDEX2"]]
+    x[["CONCINDEX2"]] <- placeholderIndex
+    x[["CONC1"]] <- x[["CONC2"]]
+    x[["CONC2"]] <- placeholderConc
+    return(x)
+    } else { return(x)}
+  }  
+  x <- as.tibble(t(apply(x, 1, exchange)))
+  x[] <- Map(`class<-`,x, class_old) #brilliant! https://stackoverflow.com/questions/27435873/changing-class-of-data-frame-columns-using-strings
+#  class_new <- sapply(x, class)
+#  print(class_new)
+  
+  
+  
+  
+  NSC1 <- dplyr::setdiff(unique(x$NSC1[!is.na(x$NSC1)]),NSC2_un)
+#  NSC1 <- unique(x$NSC1[!is.na(x$NSC1)])
+  x[(nrow(x)+1),] <- x[nrow(x),]
+  x[nrow(x),]$NSC1 <- NSC1
+  x[nrow(x),]$NSC2 <- NSC2_un
+  x[nrow(x),]$CONCINDEX1 <- x[nrow(x),]$CONCINDEX2 <- x[nrow(x),]$CONC1 <- x[nrow(x),]$CONC2 <- 0
+  x[nrow(x),]$mean_single <- 0
+  x[nrow(x),]$SAMPLE2 <- unique(x$SAMPLE2[!is.na(x$SAMPLE2)])
+
+  x$Row <- x$CONCINDEX1 + 1
+  x$Col <- x$CONCINDEX2 + 1
+  x$BlockID <- c("738-0") # sub with cell-line
+  x$Response <- x$mean_single
+  x$ConcRowUnit <- x$ConcColUnit <- c("M")
+  x$ConcRow <- x$CONC1
+  x$ConcCol <- x$CONC2
+  x$ConcCol[is.na(x$ConcCol) ] <- 0
+  x$DrugRow <- NSC1
+  x$DrugCol <- NSC2_un
+  x[is.na(x$ConcRow),]$ConcRow <- 0
+  x <- x[,-c(1:17)]
+  return(x)
+}
+
+oneComboTest_740_754143 <- withMeanGrowth_noDups %>%
+  filter((NSC1 == 740 & NSC2 ==754143) | (NSC1 == 740 & is.na(NSC2)) | (NSC1 == 754143 & is.na(NSC2)) | (NSC1 == 754143 & NSC2 ==740))
+```
+
 
 ##### this is a graveyard of ideas. Lasciate ogni speranza voi ch'entrante
 ```{r}
@@ -110,8 +179,12 @@ test7 %>%
 
 
 
-test3 <- test2 %>%
-  filter((NSC1 == 752 & NSC2 ==3088) | (NSC1 == 752 & is.na(NSC2)) | (NSC1 == 3088 & is.na(NSC2)) | (NSC1 == 3088 & NSC2 ==752))
+oneComboTest <- test2 %>%
+  filter((NSC1 == 740 & NSC2 ==53) | (NSC1 == 740 & is.na(NSC2)) | (NSC1 == 53 & is.na(NSC2)) | (NSC1 == 53 & NSC2 ==740))
+
+for_show <- test %>%
+  filter((NSC1 == 740 & NSC2 ==3053) | (NSC1 == 740 & is.na(NSC2)) | (NSC1 == 3053 & is.na(NSC2)) | (NSC1 == 3053 & NSC2 ==740))
+for_show1 <- for_show[vapply(for_show, function(x) length(unique(x)) > 1, logical(1L))]
 
 test4 <- test3[,-c(1,2,3,4,5,7,11,16)]
 
