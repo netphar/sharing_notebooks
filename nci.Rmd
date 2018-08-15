@@ -105,10 +105,15 @@ uniqueDrug1Drub2Combos <- withMeanGrowth_noDups_cleanedCols %>%
 ```
 ##### testing transformation
 ```{r}
-oneComboTest_740_3053 <- withMeanGrowth_noDups %>%
-  filter((NSC1 == 740 & NSC2 ==3053) | (NSC1 == 740 & is.na(NSC2)) | (NSC1 == 3053 & is.na(NSC2)) | (NSC1 == 3053 & NSC2 ==740))
+oneComboTest_740_737754 <- withMeanGrowth_noDups %>%
+  filter((NSC1 == 740 & NSC2 ==737754) | (NSC1 == 740 & is.na(NSC2)) | (NSC1 == 737754 & is.na(NSC2)) | (NSC1 == 737754 & NSC2 ==740)) #%>%
+#    mutate(identifier = "id1")
 
-rowInsert <- function(x){ #adding zero row
+oneComboTest_740_754143 <- withMeanGrowth_noDups %>%
+  filter((NSC1 == 740 & NSC2 ==754143) | (NSC1 == 740 & is.na(NSC2)) | (NSC1 == 754143 & is.na(NSC2)) | (NSC1 == 754143 & NSC2 ==740)) #%>%
+#    mutate(identifier = "id2")
+
+rowInsert <- function(x, blockID){ #adding zero row
   class_old <- sapply(x, class)
 #  print(class_old)
   NSC2_un <- unique(x$NSC2[!is.na(x$NSC2)])
@@ -150,7 +155,7 @@ rowInsert <- function(x){ #adding zero row
 
   x$Row <- x$CONCINDEX1 + 1
   x$Col <- x$CONCINDEX2 + 1
-  x$BlockID <- c("738-0") # sub with cell-line
+  x$BlockID <- c(blockID) # sub with cell-line
   x$Response <- x$mean_single
   x$ConcRowUnit <- x$ConcColUnit <- c("M")
   x$ConcRow <- x$CONC1
@@ -162,9 +167,56 @@ rowInsert <- function(x){ #adding zero row
   x <- x[,-c(1:17)]
   return(x)
 }
+```
+##### testing on two
+```{r}
+twoblocks <- rbind(oneComboTest_740_3053, oneComboTest_740_754143)
+meow <- twoblocks %>%
+  group_by(identifier) %>%
+    do(rowInsert(., 'test'))
+```
 
-oneComboTest_740_754143 <- withMeanGrowth_noDups %>%
-  filter((NSC1 == 740 & NSC2 ==754143) | (NSC1 == 740 & is.na(NSC2)) | (NSC1 == 754143 & is.na(NSC2)) | (NSC1 == 754143 & NSC2 ==740))
+##### testing on all the celllines
+```{r}
+uniqueDrug1Drub2CombosNoNA <-  uniqueDrug1Drub2Combos[!is.na(uniqueDrug1Drub2Combos$NSC2),] # no na's
+uniqueDrug1Drub2CombosNoNA[c(100:nrow(uniqueDrug1Drub2CombosNoNA)),] -> test
+#datalist = list() dont do it !!!
+
+#assembly <- function(x,y) {
+#  sequence <- nrow(y)
+#  
+#  
+#  output <- list()
+  datalist_full <- list()
+  x= withMeanGrowth_noDups
+  y = uniqueDrug1Drub2CombosNoNA
+  for (i in 1:nrow(y)) {
+    perrow <- list()
+    input <- list()
+    output1 <- list()
+    param1 <- vector(mode="numeric", length=1)
+    param2 <- vector(mode="numeric", length=1)
+    perrow<- y[i,]
+
+    param1 <- as.numeric(perrow[1])
+    param2 <- as.numeric(perrow[2])
+
+    input <- filter(x, ((NSC1 == param1 & NSC2 == param2) | (NSC1 == param1 & is.na(NSC2)) | (NSC1 == param2 & is.na(NSC2)) | (NSC1 == param2 & NSC2 ==param1)))
+    input[,ncol(input)+1] <- i
+    
+    output1 <-  tryCatch(rowInsert(input,i), error = function(e) NA)
+#    output1 <- rowInsert(input,i)
+    datalist_full[[i]] <- output1
+
+  }
+big_data_full = do.call(rbind, datalist_full)
+
+#}
+#assembly(withMeanGrowth_noDups, test)
+
+#apply(withMeanGrowth_noDups,1 )
+
+#by(test, 1:nrow(test), function(row) print(test[row,]))
 ```
 
 
