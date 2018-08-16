@@ -209,8 +209,17 @@ uniqueDrug1Drub2CombosNoNA[c(100:nrow(uniqueDrug1Drub2CombosNoNA)),] -> test
     datalist_full[[i]] <- output1
 
   }
-big_data_full = do.call(rbind, datalist_full)
 
+  #remove NA's
+  datalist_full[-which(is.na(datalist_full))] -> datalist_full_noNA
+  # get number of rows ineach of nested lists
+myvec <- sapply( datalist_full_noNA, NROW)
+# get rid of the ones where nrow != 16
+datalist_full_noNA_16 <- datalist_full_noNA[-which(myvec != 16)]
+  
+# rbinding for reshape
+big_data_full = do.call(rbind, datalist_full_noNA_16)
+reshaped <- ReshapeData(big_data_full,data.type = 'viability')
 #}
 #assembly(withMeanGrowth_noDups, test)
 
@@ -218,7 +227,285 @@ big_data_full = do.call(rbind, datalist_full)
 
 #by(test, 1:nrow(test), function(row) print(test[row,]))
 ```
+##### input of reshaped data. Calculate synergyscores
+```{r}
+today.full.ZIP <- CalculateSynergy(reshaped)
+```
 
+here is the original of Loewe function
+```{r}
+Loewe_modded <- function (response.mat, correction = TRUE, Emin = NA, Emax = NA, 
+    nan.handle = c("LL4", "L4")) 
+{
+    if (correction) {
+        response.mat <- BaselineCorrectionSD(response.mat, Emin = Emin, 
+            Emax = Emax, nan.handle)$corrected.mat
+    }
+    single.fit <- FittingSingleDrug(response.mat)
+    drug.col.model <- single.fit$drug.col.model
+    drug.col.par <- coef(drug.col.model)
+    d1.fun <- function(conc, drug.col.par) {
+        (drug.col.par[3] + drug.col.par[2] * (conc/drug.col.par[4])^drug.col.par[1])/(1 + 
+            (conc/drug.col.par[4])^drug.col.par[1])
+    }
+    drug.row.model <- single.fit$drug.row.model
+    drug.row.par <- coef(drug.row.model)
+    d2.fun <- function(conc, drug.row.par) {
+        (drug.row.par[3] + drug.row.par[2] * (conc/drug.row.par[4])^drug.row.par[1])/(1 + 
+            (conc/drug.row.par[4])^drug.row.par[1])
+    }
+    row.conc <- as.numeric(rownames(response.mat))[-1]
+    col.conc <- as.numeric(colnames(response.mat))[-1]
+    loewe.mat <- response.mat
+    for (i in 1:length(col.conc)) {
+        for (j in 1:length(row.conc)) {
+            x1 <- col.conc[i]
+            x2 <- row.conc[j]
+            eq <- function(x) {
+                x1/(drug.col.par[4] * (((x - drug.col.par[3])/(drug.col.par[2] - 
+                  x))^(1/drug.col.par[1]))) + x2/(drug.row.par[4] * 
+                  (((x - drug.row.par[3])/(drug.row.par[2] - 
+                    x))^(1/drug.row.par[1]))) - 1
+            }
+            slv <- nleqslv(max(drug.col.par[2] + 1, drug.row.par[2] + 
+                1), eq, method = "Newton")
+            if (slv$termcd == 1) {
+                loewe.mat[j + 1, i + 1] <- slv$x
+            }
+            else {
+                y.loewe1 <- d1.fun(x1 + x2, drug.col.par)
+                y.loewe2 <- d2.fun(x1 + x2, drug.row.par)
+                loewe.mat[j + 1, i + 1] <- ifelse(y.loewe1 > 
+                  y.loewe2, y.loewe1, y.loewe2)
+            }
+        }
+    }
+    return(response.mat - loewe.mat)
+}
+```
+
+here is Loewe is modded version.
+```{r}
+Loewe <- function (response.mat,correction, Emin = NA, Emax = NA,nan.handle = c("LL4", "L4")) {
+# scores <- list()
+#  method <- "Loewe"
+  out <- tryCatch(Loewe_modded(response.mat,correction = correction, Emin = Emin, Emax = Emax, 
+    nan.handle = nan.handle), error = function(e) NA)
+#  {
+#  x$method <- method
+#  x$scores <- x$dose.response.mats
+#  x$scores[!is.na(x$scores)] <- NA
+#  x$scores <- replace(x$scores, !is.na(x$scores), NA)
+#  purrr::map(!is.na(x$scores), NA)
+#  x$scores <- lapply(x$scores, function(z) ifelse(!is.na(z), NA, z))
+#  return(x)
+#  })
+  return(out)
+}
+```
+original ZIP
+```{r}
+ZIP_modded <- function (response.mat, correction = TRUE, Emin = 0, Emax = 100, 
+    nan.handle = c("LL4", "L4")) 
+{
+    if (correction) {
+        nan.handle <- match.arg(nan.handle)
+        response.mat <- BaselineCorrectionSD(response.mat, NA, 
+            NA, nan.handle)$corrected.mat
+    }
+    single.fitted <- FittingSingleDrug(response.mat, fixed = c(NA, 
+        Emin, Emax, NA), nan.handle)
+    drug.col.response <- single.fitted$drug.col.fitted
+    drug.row.response <- single.fitted$drug.row.fitted
+    updated.single.mat <- mat.or.vec(nrow(response.mat), ncol(response.mat))
+    colnames(updated.single.mat) <- colnames(response.mat)
+    rownames(updated.single.mat) <- rownames(response.mat)
+    updated.single.mat[1, c(2:ncol(response.mat))] <- drug.col.response
+    updated.single.mat[c(2:nrow(response.mat)), 1] <- drug.row.response
+    updated.col.mat <- updated.single.mat
+    for (i in 2:ncol(response.mat)) {
+        tmp <- as.data.frame(mat.or.vec(nrow(response.mat) - 
+            1, 0))
+        tmp$dose <- as.numeric(rownames(response.mat)[-1])
+        tmp$inhibition <- response.mat[c(2:nrow(response.mat)), 
+            i]
+        tmp.min <- updated.single.mat[1, i]
+        if (var(tmp$inhibition, na.rm = TRUE) == 0) {
+            tmp$inhibition[1] <- tmp$inhibition[1] - 10^-10
+        }
+        tmp.model <- drm(inhibition ~ dose, data = tmp, fct = L.4(fixed = c(NA, 
+            tmp.min, Emax, NA)), na.action = na.omit)
+        tmp$fitted.inhibition <- suppressWarnings(fitted(tmp.model))
+        if (tmp$fitted.inhibition[nrow(response.mat) - 1] < 0) 
+            tmp$fitted.inhibition[nrow(response.mat) - 1] <- tmp.min
+        updated.col.mat[c(2:nrow(response.mat)), i] <- tmp$fitted.inhibition
+    }
+    updated.row.mat <- updated.single.mat
+    for (i in 2:nrow(response.mat)) {
+        tmp <- as.data.frame(mat.or.vec(ncol(response.mat) - 
+            1, 0))
+        tmp$dose <- as.numeric(colnames(response.mat)[-1])
+        tmp$inhibition <- response.mat[i, c(2:ncol(response.mat))]
+        tmp.min <- updated.single.mat[i, 1]
+        if (var(tmp$inhibition, na.rm = TRUE) == 0) {
+            tmp$inhibition[1] <- tmp$inhibition[1] - 10^-10
+        }
+        tmp.model <- drm(inhibition ~ dose, data = tmp, fct = L.4(fixed = c(NA, 
+            tmp.min, Emax, NA)), na.action = na.omit)
+        tmp$fitted.inhibition <- suppressWarnings(fitted(tmp.model))
+        if (tmp$fitted.inhibition[ncol(response.mat) - 1] < 0) 
+            tmp$fitted.inhibition[ncol(response.mat) - 1] <- tmp.min
+        updated.row.mat[i, c(2:ncol(response.mat))] <- tmp$fitted.inhibition
+    }
+    fitted.mat <- (updated.col.mat + updated.row.mat)/2
+    zip.mat <- updated.single.mat
+    for (i in 2:nrow(updated.single.mat)) {
+        for (j in 2:ncol((updated.single.mat))) {
+            zip.mat[i, j] <- updated.single.mat[i, 1] + updated.single.mat[1, 
+                j] - updated.single.mat[i, 1] * updated.single.mat[1, 
+                j]/100
+        }
+    }
+    fitted.mat[1, 1] <- 0
+    zip.mat[1, 1] <- 0
+    fitted.mat <- apply(fitted.mat, c(1, 2), function(x) ifelse(x > 
+        100, 100, x))
+    delta.mat <- (fitted.mat - zip.mat)
+    delta.mat
+}
+
+```
+here is mod of ZIP with trycatch. Fails by priting out NA for every single drug comb. 
+```{r}
+ZIP <- function (response.mat,correction, Emin = NA, Emax = NA,nan.handle = c("LL4", "L4")) {
+# scores <- list()
+#  method <- "Loewe"
+  out <- tryCatch(ZIP_modded(response.mat,correction = correction, Emin = Emin, Emax = Emax, 
+    nan.handle = nan.handle), error = function(e) NA)
+#  {
+#  x$method <- method
+#  x$scores <- x$dose.response.mats
+#  x$scores[!is.na(x$scores)] <- NA
+#  x$scores <- replace(x$scores, !is.na(x$scores), NA)
+#  purrr::map(!is.na(x$scores), NA)
+#  x$scores <- lapply(x$scores, function(z) ifelse(!is.na(z), NA, z))
+#  return(x)
+#  })
+  return(out)
+}
+```
+BLISS
+```{r}
+Bliss <- function (response.mat = response.mat,correction = correction, Emin = NA, Emax = NA,nan.handle = c("LL4", "L4")) {
+# scores <- list()
+#  method <- "ZIP"
+  out <- tryCatch(BLISS_modded(response.mat,correction = correction, Emin = Emin, Emax = Emax, 
+    nan.handle = nan.handle), error = function(e) NA)
+#  {
+#  x$method <- method
+#  x$scores <- x$dose.response.mats
+#  x$scores[!is.na(x$scores)] <- NA
+#  x$scores <- replace(x$scores, !is.na(x$scores), NA)
+#  purrr::map(!is.na(x$scores), NA)
+#  x$scores <- lapply(x$scores, function(z) ifelse(!is.na(z), NA, z))
+#  return(x)
+#  })
+  return(out)
+}
+```
+BLISS_modded 
+```{r}
+BLISS_modded<- function (response.mat, correction = TRUE, Emin = NA, Emax = NA, 
+    nan.handle = c("LL4", "L4")) 
+{
+    if (correction) {
+        response.mat <- BaselineCorrectionSD(response.mat, Emin = Emin, 
+            Emax = Emax, nan.handle)$corrected.mat
+    }
+    drug1.response <- response.mat[, 1]
+    drug2.response <- response.mat[1, ]
+    ref.mat <- response.mat
+    for (i in 2:nrow(response.mat)) {
+        for (j in 2:ncol(response.mat)) {
+            ref.mat[i, j] <- drug1.response[i] + drug2.response[j] - 
+                drug1.response[i] * drug2.response[j]/100
+        }
+    }
+    syn.mat <- response.mat - ref.mat
+    syn.mat
+}
+
+```
+HSA
+```{r}
+HSA <- function (response.mat = response.mat,correction = correction, Emin = NA, Emax = NA,nan.handle = c("LL4", "L4")) {
+# scores <- list()
+#  method <- "ZIP"
+  out <- tryCatch(HSA_modded(response.mat,correction = correction, Emin = Emin, Emax = Emax, 
+    nan.handle = nan.handle), error = function(e) NA)
+#  {
+#  x$method <- method
+#  x$scores <- x$dose.response.mats
+#  x$scores[!is.na(x$scores)] <- NA
+#  x$scores <- replace(x$scores, !is.na(x$scores), NA)
+#  purrr::map(!is.na(x$scores), NA)
+#  x$scores <- lapply(x$scores, function(z) ifelse(!is.na(z), NA, z))
+#  return(x)
+#  })
+  return(out)
+}
+```
+HSA_modded
+```{r}
+HSA_modded <-function (response.mat, correction = TRUE, Emin = NA, Emax = NA, 
+    nan.handle = c("LL4", "L4")) 
+{
+    if (correction) {
+        response.mat <- BaselineCorrectionSD(response.mat, Emin = Emin, 
+            Emax = Emax, nan.handle)$corrected.mat
+    }
+    drug1.response <- response.mat[, 1]
+    drug2.response <- response.mat[1, ]
+    ref.mat <- response.mat
+    for (i in 2:nrow(response.mat)) {
+        for (j in 2:ncol(response.mat)) {
+            ref.mat[i, j] <- ifelse(drug1.response[i] > drug2.response[j], 
+                drug1.response[i], drug2.response[j])
+        }
+    }
+    syn.mat <- response.mat - ref.mat
+    syn.mat
+}
+
+```
+here is calculate synergy with added tryCatch to Loewe method
+```{r}
+CalculateSynergy <- function (data, method = "ZIP", correction = TRUE, Emin = 0, 
+    Emax = 100, nan.handle = c("LL4", "L4")) 
+{
+    if (!is.list(data)) {
+        stop("Input data is not a list format!")
+    }
+    if (!method %in% c("ZIP", "HSA", "Bliss", "Loewe")) {
+        stop("The method parameter can only be one of the following: ZIP, HSA, Bliss and Loewe.")
+    }
+    dose.response.mats <- data$dose.response.mats
+    num.pairs <- length(dose.response.mats)
+    scores <- list()
+    nan.handle <- match.arg(nan.handle)
+    for (i in 1:num.pairs) {
+        response.mat <- dose.response.mats[[i]]
+        scores[[i]] <- switch(method, 
+            ZIP = ZIP(response.mat = response.mat, correction = correction, Emin = Emin, Emax = Emax), 
+            HSA = HSA(response.mat, correction, Emin = Emin, Emax = Emax, nan.handle), 
+            Bliss = Bliss(response.mat, correction, Emin = Emin, Emax = Emax, nan.handle), 
+            Loewe = Loewe(response.mat, correction, Emin = Emin, Emax = Emax, nan.handle))
+    }
+    data$scores <- scores
+    data$method <- method
+    return(data)
+}
+```
 
 ##### this is a graveyard of ideas. Lasciate ogni speranza voi ch'entrante
 ```{r}
