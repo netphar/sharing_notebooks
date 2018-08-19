@@ -27,6 +27,11 @@ for_sorting <- nov2017
 for_sorting_one <- for_sorting %>% # taking one cell line as an example
   filter(CELLNAME=='786-0')
 
+for_sorting_two <- for_sorting %>% # taking one cell line as an example
+  filter(CELLNAME %in% cellnames)
+
+cellnames<-c('A498')
+
 saveRDS(for_sorting_one,"for_sorting_one" )
 ```
 
@@ -105,12 +110,12 @@ uniqueDrug1Drub2Combos <- withMeanGrowth_noDups_cleanedCols %>%
 ```
 ##### testing transformation
 ```{r}
-oneComboTest_740_737754 <- withMeanGrowth_noDups %>%
-  filter((NSC1 == 740 & NSC2 ==737754) | (NSC1 == 740 & is.na(NSC2)) | (NSC1 == 737754 & is.na(NSC2)) | (NSC1 == 737754 & NSC2 ==740)) #%>%
+#oneComboTest_740_737754 <- withMeanGrowth_noDups %>%
+#  filter((NSC1 == 740 & NSC2 ==737754) | (NSC1 == 740 & is.na(NSC2)) | (NSC1 == 737754 & is.na(NSC2)) | (NSC1 == 737754 & NSC2 ==740)) #%>%
 #    mutate(identifier = "id1")
 
-oneComboTest_740_754143 <- withMeanGrowth_noDups %>%
-  filter((NSC1 == 740 & NSC2 ==754143) | (NSC1 == 740 & is.na(NSC2)) | (NSC1 == 754143 & is.na(NSC2)) | (NSC1 == 754143 & NSC2 ==740)) #%>%
+#oneComboTest_740_754143 <- withMeanGrowth_noDups %>%
+#  filter((NSC1 == 740 & NSC2 ==754143) | (NSC1 == 740 & is.na(NSC2)) | (NSC1 == 754143 & is.na(NSC2)) | (NSC1 == 754143 & NSC2 ==740)) #%>%
 #    mutate(identifier = "id2")
 
 rowInsert <- function(x, blockID){ #adding zero row
@@ -170,10 +175,10 @@ rowInsert <- function(x, blockID){ #adding zero row
 ```
 ##### testing on two
 ```{r}
-twoblocks <- rbind(oneComboTest_740_3053, oneComboTest_740_754143)
-meow <- twoblocks %>%
-  group_by(identifier) %>%
-    do(rowInsert(., 'test'))
+#twoblocks <- rbind(oneComboTest_740_3053, oneComboTest_740_754143)
+#meow <- twoblocks %>%
+#  group_by(identifier) %>%
+#    do(rowInsert(., 'test'))
 ```
 
 ##### testing on all the celllines
@@ -220,6 +225,14 @@ datalist_full_noNA_16 <- datalist_full_noNA[-which(myvec != 16)]
 # rbinding for reshape
 big_data_full = do.call(rbind, datalist_full_noNA_16)
 reshaped <- ReshapeData(big_data_full,data.type = 'viability')
+reshaped$drug.pairs <- reshaped$drug.pairs %>%
+  rowwise() %>%
+    mutate(blockIDs = paste(blockIDs, "786-0", sep = ":"))
+
+#we need to append a cell identifier to drugpairs blockid
+
+
+reshaped_786_0 <- reshaped
 #}
 #assembly(withMeanGrowth_noDups, test)
 
