@@ -178,6 +178,8 @@ reshaped <- ReshapeData(unbound_filtered, data.type = 'viability')
 
 
 # for synergy calc
+library("drc")
+
 Loewe_modded <- function (response.mat, correction = T, Emin = 0, Emax = 100, 
                           nan.handle = c("LL4", "L4")) 
 {
@@ -402,6 +404,112 @@ HSA_modded <-function (response.mat, correction = T, Emin = 0, Emax = 100,
   syn.mat <- response.mat - ref.mat
   syn.mat
 }
+
+CalculateSynergy <- function (data, method = "ZIP", correction = TRUE, Emin = 0, 
+                              Emax = 100, nan.handle = c("LL4", "L4")) 
+{
+  if (!is.list(data)) {
+    stop("Input data is not a list format!")
+  }
+  if (!method %in% c("ZIP", "HSA", "Bliss", "Loewe")) {
+    stop("The method parameter can only be one of the following: ZIP, HSA, Bliss and Loewe.")
+  }
+  dose.response.mats <- data$dose.response.mats
+  num.pairs <- length(dose.response.mats)
+  scores <- list()
+  nan.handle <- match.arg(nan.handle)
+  for (i in 1:num.pairs) {
+    response.mat <- dose.response.mats[[i]]
+    scores[[i]] <- switch(method, ZIP = ZIP(response.mat, 
+                                            correction, Emin = Emin, Emax = Emax, nan.handle), 
+                          HSA = HSA(response.mat, correction, Emin = Emin, 
+                                    Emax = Emax, nan.handle), Bliss = Bliss(response.mat, 
+                                                                            correction, Emin = Emin, Emax = Emax, nan.handle), 
+                          Loewe = Loewe(response.mat, correction, Emin = Emin, 
+                                        Emax = Emax, nan.handle))
+  }
+  data$scores <- scores
+  data$method <- method
+  return(data)
+}
+
+BaselineCorrectionSD <- function (response.mat, Emin = NA, Emax = NA, nan.handle = c("LL4", 
+                                                             "L4")) 
+{
+  pm <- response.mat
+  if (is.null(rownames(response.mat)) | is.null(colnames(response.mat))) {
+    stop("Please provide drug contrations as row names and column names!")
+  }
+  nan.handle <- match.arg(nan.handle)
+  single.fitted <- FittingSingleDrug(response.mat, c(NA, Emin, 
+                                                     Emax, NA), nan.handle)
+  baseline <- (min(as.numeric(single.fitted$drug.row.fitted)) + 
+                 min(as.numeric(single.fitted$drug.col.fitted)))/2
+  pm.corrected <- pm - ((100 - pm)/100 * baseline)
+  output <- list(original.mat = pm, corrected.mat = pm.corrected)
+  return(output)
+}
+
+FittingSingleDrug <- function (response.mat, fixed = c(NA, NA, NA, NA), nan.handle = c("LL4", 
+                                                                                       "L4")) 
+{
+  r.num <- nrow(response.mat)
+  c.num <- ncol(response.mat)
+  drug.col <- cbind(as.numeric(colnames(response.mat)[-1]), 
+                    response.mat[1, 2:c.num])
+  colnames(drug.col) <- c("conc", "effect")
+  drug.col <- as.data.frame(apply(drug.col, 2, as.numeric))
+  if (var(drug.col$effect) == 0) {
+    drug.col$effect[nrow(drug.col)] <- drug.col$effect[nrow(drug.col)] + 
+      10^-10
+  }
+  nan.handle <- match.arg(nan.handle)
+  drug.col.model <- tryCatch({
+    drm(effect ~ conc, data = drug.col, fct = LL.4(fixed = fixed), 
+        na.action = na.omit, control = drmc(errorm = FALSE))
+  }, warning = function(w) {
+    if (nan.handle == "L4") {
+      drm(effect ~ conc, data = drug.col, fct = L.4(fixed = fixed), 
+          na.action = na.omit, control = drmc(errorm = FALSE))
+    }
+    else {
+      drm(effect ~ conc, data = drug.col, fct = LL.4(fixed = fixed), 
+          na.action = na.omit, control = drmc(errorm = FALSE))
+    }
+  }, error = function(e) {
+    drm(effect ~ conc, data = drug.col, fct = L.4(fixed = fixed), 
+        na.action = na.omit, control = drmc(errorm = FALSE))
+  })
+  drug.col.fitted <- suppressWarnings(fitted(drug.col.model))
+  drug.row <- cbind(as.numeric(rownames(response.mat)[-1]), 
+                    response.mat[2:r.num, 1])
+  colnames(drug.row) <- c("conc", "effect")
+  drug.row <- as.data.frame(apply(drug.row, 2, as.numeric))
+  if (var(drug.row$effect) == 0) {
+    drug.row$effect[nrow(drug.row)] <- drug.row$effect[nrow(drug.row)] + 
+      10^-10
+  }
+  drug.row.model <- tryCatch({
+    drm(effect ~ conc, data = drug.row, fct = LL.4(fixed = fixed), 
+        na.action = na.omit, control = drmc(errorm = FALSE))
+  }, warning = function(w) {
+    if (nan.handle == "L4") {
+      drm(effect ~ conc, data = drug.row, fct = L.4(fixed = fixed), 
+          na.action = na.omit, control = drmc(errorm = FALSE))
+    }
+    else {
+      drm(effect ~ conc, data = drug.row, fct = LL.4(fixed = fixed), 
+          na.action = na.omit, control = drmc(errorm = FALSE))
+    }
+  }, error = function(e) {
+    drm(effect ~ conc, data = drug.row, fct = L.4(fixed = fixed), 
+        na.action = na.omit, control = drmc(errorm = FALSE))
+  })
+  drug.row.fitted <- suppressWarnings(fitted(drug.row.model))
+  return(list(drug.row.fitted = drug.row.fitted, drug.row.model = drug.row.model, 
+              drug.col.model = drug.col.model, drug.col.fitted = drug.col.fitted))
+}
+
 
 #####
 #some error handling
