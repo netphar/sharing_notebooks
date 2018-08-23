@@ -1,4 +1,15 @@
 library(dplyr)
+library(synergyfinder)
+
+#NB figure out how to sort out nesteded lists in place
+# or use makeshift dictionary
+# or just simple max() and extract the top n hits
+
+#creates a list of key:value pairs. Where is key is WellID and value is Condition
+mylist <- list()
+for (i in seq_along(keys)) {
+  mylist[keys[i]] <- values[i]
+}
 
 #this adds median scores sublist to the calculate synergy results 
 
@@ -21,6 +32,11 @@ CalculateMedianSynergy(testing.Bliss) -> testing.Bliss.with.medians
 CalculateMedianSynergy(testing.Loewe) -> testing.Loewe.with.medians
 CalculateMedianSynergy(testing.HSA) -> testing.HSA.with.medians
 CalculateMedianSynergy(testing.ZIP) -> testing.ZIP.with.medians
+
+#get top sorted median synergy scores
+##sorts descending and creates a matrix with drug a, drug b, blockID, mean syn score
+sorted.syn.scores.Bliss <- testing.Bliss.with.medians$median[order(testing.Bliss.with.medians$median, decreasing = T),]
+top3 <- sorted.syn.scores[(1:3),]
 
 #####
 #end of working piece
