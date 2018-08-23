@@ -1,6 +1,8 @@
 #housekeeping
 library("tidyverse")
-library("synergyfinder")
+library('drc')
+library('reshape2') # is it necessary?
+#library("synergyfinder") # i do not want to use save
 setwd('/Users/zagidull/Documents/fimm_files/synergy_calc_august/almanac')
 
 #reading in the data and correcting col classes
@@ -119,7 +121,7 @@ datalist_full <- list()
 
 #cellnames to be searched for
 cellnames_old <- unique(nov2017$CELLNAME)
-cellnames <- cellnames_old[-61]
+cellnames <- cellnames_old[-61] #todo check why the last cell line has to be removed
 
 #cellnames <- c("HCT-116")
 
@@ -178,7 +180,7 @@ reshaped <- ReshapeData(unbound_filtered, data.type = 'viability')
 
 
 # for synergy calc
-library("drc")
+#library("drc")
 
 Loewe_modded <- function (response.mat, correction = T, Emin = 0, Emax = 100, 
                           nan.handle = c("LL4", "L4")) 
@@ -510,6 +512,62 @@ FittingSingleDrug <- function (response.mat, fixed = c(NA, NA, NA, NA), nan.hand
               drug.col.model = drug.col.model, drug.col.fitted = drug.col.fitted))
 }
 
+ReshapeData <- function (data, data.type = "viability") 
+{
+  if (!all(c("BlockID", "DrugRow", "DrugCol", "Row", "Col", 
+             "Response", "ConcRow", "ConcCol", "ConcRowUnit", "ConcColUnit") %in% 
+           colnames(data))) 
+    stop("The input data must contain the following columns: BlockID, DrugRow, DrugCol, Row, Col, Response,\n         ConcRow, ConcCol, ConcRowUnit, ConcColUnit")
+  id.drug.comb <- unique(data$BlockID)
+  dose.response.mats <- list()
+  drug.pairs <- data.frame(drug.row = character(length(id.drug.comb)), 
+                           drug.col = character(length(id.drug.comb)), concRUnit = character(length(id.drug.comb)), 
+                           concCUnit = character(length(id.drug.comb)), blockIDs = numeric(length(id.drug.comb)), 
+                           stringsAsFactors = FALSE)
+  for (i in 1:length(id.drug.comb)) {
+    tmp.mat <- data[which(data$BlockID == id.drug.comb[i]), 
+                    ]
+    if (data.type == "viability") {
+      tmp.mat$Inhibition <- 100 - tmp.mat$Response
+    }
+    else {
+      tmp.mat$Inhibition <- tmp.mat$Response
+    }
+    conc.col <- tmp.mat$ConcCol[which(tmp.mat$Row == 1)]
+    conc.col <- conc.col[order(tmp.mat$Col[which(tmp.mat$Row == 
+                                                   1)])]
+    conc.row <- tmp.mat$ConcRow[which(tmp.mat$Col == 1)]
+    conc.row <- conc.row[order(tmp.mat$Row[which(tmp.mat$Col == 
+                                                   1)])]
+    response.mat <- acast(tmp.mat, Row ~ Col, value.var = "Inhibition")
+    colnames(response.mat) <- conc.col
+    rownames(response.mat) <- conc.row
+    if (which.max(conc.row) == 1 & which.max(conc.col) == 
+        1) {
+      response.mat <- t(apply(apply(response.mat, 2, rev), 
+                              1, rev))
+    }
+    else if (which.max(conc.row) == length(conc.row) & which.max(conc.col) == 
+             1) {
+      response.mat <- t(apply(response.mat, 1, rev))
+    }
+    else if (which.max(conc.row) == 1 & which.max(conc.col) == 
+             length(conc.col)) {
+      response.mat <- apply(response.mat, 2, rev)
+    }
+    conc.runit <- unique(tmp.mat$ConcRowUnit)
+    conc.cunit <- unique(tmp.mat$ConcColUnit)
+    drug.row <- unique(tmp.mat$DrugRow)
+    drug.col <- unique(tmp.mat$DrugCol)
+    drug.pairs$drug.row[i] <- drug.row
+    drug.pairs$drug.col[i] <- drug.col
+    drug.pairs$concRUnit[i] <- conc.runit
+    drug.pairs$concCUnit[i] <- conc.cunit
+    dose.response.mats[[i]] <- response.mat
+  }
+  drug.pairs$blockIDs <- id.drug.comb
+  return(list(dose.response.mats = dose.response.mats, drug.pairs = drug.pairs))
+}
 
 #####
 #some error handling
