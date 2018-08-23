@@ -18,6 +18,14 @@ CalculateSynergy(testing, method = "Loewe") -> testing.Loewe
 CalculateSynergy(testing, method = "HSA") -> testing.HSA
 CalculateSynergy(testing) -> testing.ZIP
 
+#this calculates synergy for the full valid 3x3 and 3x5 matrixes of NCI ALMANAC. 307737 dose response mats
+CalculateSynergy(reshaped, method = "Bliss") -> reshaped.Bliss
+CalculateSynergy(reshaped, method = "Loewe") -> reshaped.Loewe
+CalculateSynergy(reshaped, method = "HSA") -> reshaped.HSA
+CalculateSynergy(reshaped) -> reshaped.ZIP
+
+
+# this adds an extra nested list to the calculated synergy values list. It contains median synergy rounded to 3 sig digits, like in synergyfinder
 CalculateMedianSynergy <- function(x) {
   x$median <- list()
   for (i in 1:nrow(x$drug.pairs)) {

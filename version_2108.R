@@ -179,6 +179,12 @@ unbound_filtered <- unbound %>%
 reshaped <- ReshapeData(unbound_filtered, data.type = 'viability')
 
 
+#this calculates synergy for the full valid 3x3 and 3x5 matrixes of NCI ALMANAC. 307737 dose response mats
+CalculateSynergy(reshaped, method = "Bliss") -> reshaped.Bliss
+CalculateSynergy(reshaped, method = "Loewe") -> reshaped.Loewe
+CalculateSynergy(reshaped, method = "HSA") -> reshaped.HSA
+CalculateSynergy(reshaped) -> reshaped.ZIP
+
 # for synergy calc
 #library("drc")
 
