@@ -180,15 +180,25 @@ reshaped <- ReshapeData(unbound_filtered, data.type = 'viability')
 
 
 #this calculates synergy for the full valid 3x3 and 3x5 matrixes of NCI ALMANAC. 307737 dose response mats
-CalculateSynergy(reshaped, method = "Bliss") -> reshaped.Bliss
-CalculateSynergy(reshaped, method = "Loewe") -> reshaped.Loewe
+
 CalculateSynergy(reshaped, method = "HSA") -> reshaped.HSA
+CalculateSynergy(reshaped, method = "Bliss") -> reshaped.Bliss
+
+CalculateSynergy(reshaped, method = "Loewe") -> reshaped.Loewe
 CalculateSynergy(reshaped) -> reshaped.ZIP
 
 # for synergy calc
 #library("drc")
 
-Loewe_modded <- function (response.mat, correction = T, Emin = 0, Emax = 100, 
+
+
+#it tries to use only LL.4 model for fitting the data. 
+# but d1.fun and d2.fun depend one which model was used to fit: LL.4 vs L.4
+# so we end up having 4 scenarios -> both row and col LL4, both row and col L4, and then row LL4 col L4; row L4 and col LL4
+# drug.col.par/drug.row.par 1,2,3,4 -> b,c,d,e
+
+#original
+Loewe_modded_original <- function (response.mat, correction = T, Emin = 0, Emax = 100, 
                           nan.handle = c("LL4", "L4")) 
 {
   if (correction) {
@@ -236,7 +246,101 @@ Loewe_modded <- function (response.mat, correction = T, Emin = 0, Emax = 100,
   }
   return(response.mat - loewe.mat)
 }
-Loewe <- function (response.mat,correction = T, Emin = 0, Emax = 100,nan.handle = c("LL4", "L4")) {
+
+#modified by jing 27/08
+Loewe_modded = function (response.mat, correction = TRUE, Emin = NA, Emax = NA, 
+                   nan.handle = c("L4")) 
+{
+  if (correction) {
+    response.mat <- BaselineCorrectionSD(response.mat, Emin = Emin, 
+                                          Emax = Emax, nan.handle)$corrected.mat
+  }
+  single.fit <- FittingSingleDrug(response.mat,fixed = c(NA, NA, NA, NA), nan.handle)
+  drug.col.model <- single.fit$drug.col.model
+  drug.col.par <- coef(drug.col.model)
+  d1.fun <- function(conc, drug.col.par) {
+    # LL.4
+    if(length(grep("LL.4", drug.col.model$call$fct))> 0 )
+      (drug.col.par[3] + drug.col.par[2] * (conc/drug.col.par[4])^drug.col.par[1])/(1 + 
+                                                                                      (conc/drug.col.par[4])^drug.col.par[1])
+    else # L.4
+      (drug.col.par[2] + (drug.col.par[3] - drug.col.par[2])/(1+exp(drug.col.par[1]*(conc-drug.col.par[4]))))
+  }
+  
+  drug.row.model <- single.fit$drug.row.model
+  drug.row.par <- coef(drug.row.model)
+  d2.fun <- function(conc, drug.row.par) {
+    if(length(grep("LL.4", drug.row.model$call$fct))> 0 ) # LL.4
+      (drug.row.par[3] + drug.row.par[2] * (conc/drug.row.par[4])^drug.row.par[1])/(1 + 
+                                                                                      (conc/drug.row.par[4])^drug.row.par[1])
+    else #L.4
+      (drug.row.par[2] + (drug.row.par[3] - drug.row.par[2])/(1+exp(drug.row.par[1]*(conc-drug.row.par[4]))))
+  }
+  row.conc <- as.numeric(rownames(response.mat))[-1]
+  col.conc <- as.numeric(colnames(response.mat))[-1]
+  loewe.mat <- response.mat
+  
+  # Four functions to calculate loewe 
+  eq.LL4.LL4 <- function(x, x1, x2, drug.col.par, drug.row.par) {# Eq.8 in the ZIP paper
+    x1/(drug.col.par[4] * (((x - drug.col.par[3])/(drug.col.par[2] - x))^(1/drug.col.par[1]))) + 
+      x2/(drug.row.par[4] * (((x - drug.row.par[3])/(drug.row.par[2] - x))^(1/drug.row.par[1]))) - 1
+  }
+  
+  eq.L4.L4 <- function(x, x1, x2, drug.col.par, drug.row.par) {
+    x1/(drug.col.par[4] + log((drug.col.par[3]-x)/(x-drug.col.par[2]))/drug.col.par[1]) +
+      x2/(drug.row.par[4] + log((drug.row.par[3]-x)/(x-drug.row.par[2]))/drug.row.par[1]) -1
+  }
+  
+  eq.LL4.L4 <- function(x, x1, x2, drug.col.par, drug.row.par) {
+    x1/(drug.col.par[4] * (((x - drug.col.par[3])/(drug.col.par[2] - x))^(1/drug.col.par[1]))) +
+      x2/(drug.row.par[4] + log((drug.row.par[3]-x)/(x-drug.row.par[2]))/drug.row.par[1]) -1
+  }
+  
+  eq.L4.LL4 <- function(x, x1, x2, drug.col.par, drug.row.par) {
+    x1/(drug.col.par[4] + log((drug.col.par[3]-x)/(x-drug.col.par[2]))/drug.col.par[1]) +
+      x2/(drug.row.par[4] * (((x - drug.row.par[3])/(drug.row.par[2] - x))^(1/drug.row.par[1]))) - 1
+  }
+  
+  cond1 = length(grep("LL.4", drug.col.model$call$fct))> 0 
+  cond2 = length(grep("LL.4", drug.row.model$call$fct))> 0 
+  if( cond1 == T & cond2 == T) eq = eq.LL4.LL4
+  if( cond1 == T & cond2 == F) eq = eq.LL4.L4
+  if( cond1 == F & cond2 == T) eq = eq.L4.LL4
+  if( cond1 == F & cond2 == F) eq = eq.L4.L4
+  
+  for (i in 1:length(col.conc)) {
+    for (j in 1:length(row.conc)) {
+      x1 <- col.conc[i]
+      x2 <- row.conc[j]
+      
+      options(warn = -1)
+      slv = tryCatch(
+        {
+          slv <- nleqslv(max(drug.col.par[2] + 1, drug.row.par[2] + 1), eq, method = "Newton", x1=x1, x2=x2, drug.col.par = drug.col.par, drug.row.par = drug.row.par)
+          
+        }, error = function(cond){
+          slv = list(termcd = 0, x = 0)
+        }
+      )
+      
+      
+      options(warn = 0)
+      
+      if (slv$termcd == 1) {
+        loewe.mat[j + 1, i + 1] <- slv$x
+      }
+      else {
+        y.loewe1 <- d1.fun(x1 + x2, drug.col.par)
+        y.loewe2 <- d2.fun(x1 + x2, drug.row.par)
+        loewe.mat[j + 1, i + 1] <- ifelse(y.loewe1 > 
+                                            y.loewe2, y.loewe1, y.loewe2)
+      }
+    }
+  }
+  
+  return(response.mat - loewe.mat)
+}
+Loewe <- function (response.mat,correction = T, Emin = 0, Emax = NA,nan.handle = c("L4")) {
   # scores <- list()
   #  method <- "Loewe"
   out <- tryCatch(Loewe_modded(response.mat,correction = correction, Emin = Emin, Emax = Emax, 
@@ -268,9 +372,15 @@ ZIP_modded <- function (response.mat, correction = T, Emin = 0, Emax = 100,
   updated.single.mat <- mat.or.vec(nrow(response.mat), ncol(response.mat))
   colnames(updated.single.mat) <- colnames(response.mat)
   rownames(updated.single.mat) <- rownames(response.mat)
-  updated.single.mat[1, c(2:ncol(response.mat))] <- drug.col.response
-  updated.single.mat[c(2:nrow(response.mat)), 1] <- drug.row.response
+  #oringinal
+  #updated.single.mat[1, c(2:ncol(response.mat))] <- drug.col.response
+  #updated.single.mat[c(2:nrow(response.mat)), 1] <- drug.row.response
+  #modified by Jing 27/08
+  updated.single.mat[1, c(2:ncol(response.mat))] <- drug.col.response[-1]
+  updated.single.mat[c(2:nrow(response.mat)), 1] <- drug.row.response[-1]
+  
   updated.col.mat <- updated.single.mat
+  
   for (i in 2:ncol(response.mat)) {
     tmp <- as.data.frame(mat.or.vec(nrow(response.mat) - 
                                       1, 0))
@@ -278,14 +388,41 @@ ZIP_modded <- function (response.mat, correction = T, Emin = 0, Emax = 100,
     tmp$inhibition <- response.mat[c(2:nrow(response.mat)), 
                                    i]
     tmp.min <- updated.single.mat[1, i]
+    
+    
     if (var(tmp$inhibition, na.rm = TRUE) == 0) {
       tmp$inhibition[1] <- tmp$inhibition[1] - 10^-10
     }
-    tmp.model <- drm(inhibition ~ dose, data = tmp, fct = L.4(fixed = c(NA, 
-                                                                        tmp.min, Emax, NA)), na.action = na.omit)
-    tmp$fitted.inhibition <- suppressWarnings(fitted(tmp.model))
-    if (tmp$fitted.inhibition[nrow(response.mat) - 1] < 0) 
-      tmp$fitted.inhibition[nrow(response.mat) - 1] <- tmp.min
+    #modified Jing 27/08. Original was fitting L.4 function by default, but it sohuld have been Ll.4. 
+    if (nrow(tmp) == 1) {
+      fitted.inhibition = response.mat[c(2:nrow(response.mat)), i]
+    } else {
+      tmp.model = tryCatch(    
+        {tmp.model <- drm(inhibition ~ dose, data = tmp, fct = LL.4(fixed = c(NA, 
+                                                                                                   tmp.min, Emax, NA)), na.action = na.omit)
+    }, warning = function(w) {
+      tmp.model <- drm(inhibition ~ dose, data = tmp, fct = L.4(fixed = c(NA, 
+                                                                          tmp.min, Emax, NA)), na.action = na.omit)
+    }, error = function(e) {
+      tmp.model <- drm(inhibition ~ dose, data = tmp, fct = L.4(fixed = c(NA, 
+                                                                          tmp.min, Emax, NA)), na.action = na.omit)
+    }
+      )
+      fitted.inhibition <- suppressWarnings(fitted(tmp.model))
+    }
+#original
+#        tmp.model <- drm(inhibition ~ dose, data = tmp, fct = L.4(fixed = c(NA, 
+#                                                                        tmp.min, Emax, NA)), na.action = na.omit)
+   
+    
+   #original 
+  #   tmp$fitted.inhibition <- suppressWarnings(fitted(tmp.model))
+    
+    #modified by jing 27/08
+    tmp$fitted.inhibition = fitted.inhibition
+     
+    # if (tmp$fitted.inhibition[nrow(response.mat) - 1] < 0) 
+    #  tmp$fitted.inhibition[nrow(response.mat) - 1] <- tmp.min
     updated.col.mat[c(2:nrow(response.mat)), i] <- tmp$fitted.inhibition
   }
   updated.row.mat <- updated.single.mat
@@ -298,13 +435,36 @@ ZIP_modded <- function (response.mat, correction = T, Emin = 0, Emax = 100,
     if (var(tmp$inhibition, na.rm = TRUE) == 0) {
       tmp$inhibition[1] <- tmp$inhibition[1] - 10^-10
     }
-    tmp.model <- drm(inhibition ~ dose, data = tmp, fct = L.4(fixed = c(NA, 
-                                                                        tmp.min, Emax, NA)), na.action = na.omit)
-    tmp$fitted.inhibition <- suppressWarnings(fitted(tmp.model))
-    if (tmp$fitted.inhibition[ncol(response.mat) - 1] < 0) 
-      tmp$fitted.inhibition[ncol(response.mat) - 1] <- tmp.min
+    
+    
+    if (nrow(tmp) == 1) {
+      fitted.inhibition = response.mat[i, c(2:ncol(response.mat))]
+    } else {
+      tmp.model = tryCatch(    
+        {tmp.model <- drm(inhibition ~ dose, data = tmp, fct = LL.4(fixed = c(NA, 
+                                                                              tmp.min, Emax, NA)), na.action = na.omit)
+        }, warning = function(w) {
+          tmp.model <- drm(inhibition ~ dose, data = tmp, fct = L.4(fixed = c(NA, 
+                                                                              tmp.min, Emax, NA)), na.action = na.omit)
+        }, error = function(e) {
+          tmp.model <- drm(inhibition ~ dose, data = tmp, fct = L.4(fixed = c(NA, 
+                                                                              tmp.min, Emax, NA)), na.action = na.omit)
+        }
+      )
+      fitted.inhibition <- suppressWarnings(fitted(tmp.model))
+    }
+    tmp$fitted.inhibition <- fitted.inhibition
     updated.row.mat[i, c(2:ncol(response.mat))] <- tmp$fitted.inhibition
-  }
+    }
+    #tmp.model <- drm(inhibition ~ dose, data = tmp, fct = L.4(fixed = c(NA, 
+    #                                                                    tmp.min, Emax, NA)), na.action = na.omit)
+   
+    
+#     tmp$fitted.inhibition <- suppressWarnings(fitted(tmp.model))
+ #   if (tmp$fitted.inhibition[ncol(response.mat) - 1] < 0) 
+#      tmp$fitted.inhibition[ncol(response.mat) - 1] <- tmp.min
+ #   updated.row.mat[i, c(2:ncol(response.mat))] <- tmp$fitted.inhibition
+#  }
   fitted.mat <- (updated.col.mat + updated.row.mat)/2
   zip.mat <- updated.single.mat
   for (i in 2:nrow(updated.single.mat)) {
@@ -413,8 +573,11 @@ HSA_modded <-function (response.mat, correction = T, Emin = 0, Emax = 100,
   syn.mat
 }
 
-CalculateSynergy <- function (data, method = "ZIP", correction = TRUE, Emin = 0, 
-                              Emax = 100, nan.handle = c("LL4", "L4")) 
+#original
+#CalculateSynergy <- function (data, method = "ZIP", correction = TRUE, Emin = 0, 
+#                              Emax = 100, nan.handle = c("LL4", "L4")) 
+# modified by Jing 27/08
+CalculateSynergy <- function (data, method = "ZIP", correction = TRUE, Emin = 0, Emax = NA, nan.handle = c("L4"))
 {
   if (!is.list(data)) {
     stop("Input data is not a list format!")
@@ -463,14 +626,27 @@ FittingSingleDrug <- function (response.mat, fixed = c(NA, NA, NA, NA), nan.hand
 {
   r.num <- nrow(response.mat)
   c.num <- ncol(response.mat)
-  drug.col <- cbind(as.numeric(colnames(response.mat)[-1]), 
-                    response.mat[1, 2:c.num])
-  colnames(drug.col) <- c("conc", "effect")
+  #drug.col <- cbind(as.numeric(colnames(response.mat)[-1]), #original
+  drug.col <- cbind(as.numeric(colnames(response.mat)), # modified by Jing 27/08
+ #                   response.mat[1, 2:c.num]) #original
+                      response.mat[1, 1:c.num]) # modified by Jing 27/08
+ colnames(drug.col) <- c("conc", "effect")
   drug.col <- as.data.frame(apply(drug.col, 2, as.numeric))
-  if (var(drug.col$effect) == 0) {
+ 
+  #modified JIng 27/08 
+  if(nrow(drug.col) != 1) {
+    if (var(drug.col$effect) == 0) {
     drug.col$effect[nrow(drug.col)] <- drug.col$effect[nrow(drug.col)] + 
       10^-10
-  }
+    }}
+ #original 
+  #if (var(drug.col$effect) == 0) {
+  #  drug.col$effect[nrow(drug.col)] <- drug.col$effect[nrow(drug.col)] + 
+  #    10^-10
+  #}
+  
+  
+  
   nan.handle <- match.arg(nan.handle)
   drug.col.model <- tryCatch({
     drm(effect ~ conc, data = drug.col, fct = LL.4(fixed = fixed), 
@@ -489,14 +665,30 @@ FittingSingleDrug <- function (response.mat, fixed = c(NA, NA, NA, NA), nan.hand
         na.action = na.omit, control = drmc(errorm = FALSE))
   })
   drug.col.fitted <- suppressWarnings(fitted(drug.col.model))
-  drug.row <- cbind(as.numeric(rownames(response.mat)[-1]), 
-                    response.mat[2:r.num, 1])
+  
+  #original
+ # drug.row <- cbind(as.numeric(rownames(response.mat)[-1]), 
+#                    response.mat[2:r.num, 1])
+
+  #modified Jing 27/08
+  drug.row <- cbind(as.numeric(rownames(response.mat)), 
+                    response.mat[1:r.num, 1])
+  
   colnames(drug.row) <- c("conc", "effect")
   drug.row <- as.data.frame(apply(drug.row, 2, as.numeric))
-  if (var(drug.row$effect) == 0) {
-    drug.row$effect[nrow(drug.row)] <- drug.row$effect[nrow(drug.row)] + 
-      10^-10
+#original
+ #   if (var(drug.row$effect) == 0) { 
+#    drug.row$effect[nrow(drug.row)] <- drug.row$effect[nrow(drug.row)] + 
+#      10^-10
+#    }
+  #modified by Jing 27/08
+  if (nrow(drug.row) != 1) {
+    if (var(drug.row$effect) == 0) { 
+      drug.row$effect[nrow(drug.row)] <- drug.row$effect[nrow(drug.row)] + 
+        10^-10
+    }
   }
+  
   drug.row.model <- tryCatch({
     drm(effect ~ conc, data = drug.row, fct = LL.4(fixed = fixed), 
         na.action = na.omit, control = drmc(errorm = FALSE))
