@@ -184,8 +184,11 @@ reshaped <- ReshapeData(unbound_filtered, data.type = 'viability')
 CalculateSynergy(reshaped, method = "HSA") -> reshaped.HSA
 CalculateSynergy(reshaped, method = "Bliss") -> reshaped.Bliss
 
-CalculateSynergy(reshaped, method = "Loewe") -> reshaped.Loewe
-CalculateSynergy(reshaped) -> reshaped.ZIP
+CalculateSynergy(reshaped, method = "ZIP", correction = T) -> reshaped.ZIP
+saveRDS(object = reshaped.ZIP, file = 'ZIP')
+CalculateSynergy(reshaped, method = "Loewe", correction = T) -> reshaped.Loewe
+saveRDS(object = reshaped.Loewe, file = 'Loewe')
+
 
 # for synergy calc
 #library("drc")
@@ -248,17 +251,18 @@ Loewe_modded_original <- function (response.mat, correction = T, Emin = 0, Emax 
 }
 
 #modified by jing 27/08
-Loewe_modded = function (response.mat, correction = TRUE, Emin = NA, Emax = NA, 
-                   nan.handle = c("L4")) 
+Loewe_modded <- function (response.mat, correction = TRUE, Emin = NA, Emax = NA, 
+                                nan.handle = c("L4")) 
 {
   if (correction) {
-    response.mat <- BaselineCorrectionSD(response.mat, Emin = Emin, 
+    response.mat <- BaselineCorrectionSD2(response.mat, Emin = Emin, 
                                           Emax = Emax, nan.handle)$corrected.mat
   }
-  single.fit <- FittingSingleDrug(response.mat,fixed = c(NA, NA, NA, NA), nan.handle)
+  single.fit <- FittingSingleDrug2(response.mat,fixed = c(NA, NA, NA, NA), nan.handle)
   drug.col.model <- single.fit$drug.col.model
   drug.col.par <- coef(drug.col.model)
-  d1.fun <- function(conc, drug.col.par) {
+  d1.fun <- function(conc, drug.col.model) {
+    drug.col.par <- coef(drug.col.model)
     # LL.4
     if(length(grep("LL.4", drug.col.model$call$fct))> 0 )
       (drug.col.par[3] + drug.col.par[2] * (conc/drug.col.par[4])^drug.col.par[1])/(1 + 
@@ -269,7 +273,8 @@ Loewe_modded = function (response.mat, correction = TRUE, Emin = NA, Emax = NA,
   
   drug.row.model <- single.fit$drug.row.model
   drug.row.par <- coef(drug.row.model)
-  d2.fun <- function(conc, drug.row.par) {
+  d2.fun <- function(conc, drug.row.model) {
+    drug.row.par <- coef(drug.row.model)
     if(length(grep("LL.4", drug.row.model$call$fct))> 0 ) # LL.4
       (drug.row.par[3] + drug.row.par[2] * (conc/drug.row.par[4])^drug.row.par[1])/(1 + 
                                                                                       (conc/drug.row.par[4])^drug.row.par[1])
@@ -330,10 +335,9 @@ Loewe_modded = function (response.mat, correction = TRUE, Emin = NA, Emax = NA,
         loewe.mat[j + 1, i + 1] <- slv$x
       }
       else {
-        y.loewe1 <- d1.fun(x1 + x2, drug.col.par)
-        y.loewe2 <- d2.fun(x1 + x2, drug.row.par)
-        loewe.mat[j + 1, i + 1] <- ifelse(y.loewe1 > 
-                                            y.loewe2, y.loewe1, y.loewe2)
+        y.loewe1 <- d1.fun(x1 + x2, drug.col.model)
+        y.loewe2 <- d2.fun(x1 + x2, drug.row.model)
+        loewe.mat[j + 1, i + 1] <- ifelse(100 > max(y.loewe1, y.loewe2), max(y.loewe1, y.loewe2), 100)
       }
     }
   }
