@@ -1,8 +1,19 @@
+# this script is used to run CalculateSynergy on fimm server
+# version of CalculateSynergy is current as of 28.08
+# input is R list of lists, result synergyfinder::ReshapeData()
+# NB: there is error handling added in form of tryCatch for CalculateSynergy. As well as in downstream functions
+# NB1: global options(warn = -1) and options(warn = 0) are set throughout the script.
+
 library("tidyverse")
 library('drc')
 library('reshape2')
 library('nleqslv')
 
+#for debug on laptop
+#setwd('/Users/zagidull/Documents/fimm_files/synergy_calc_august/almanac')
+#input <- readRDS(file = '2208_first_100_combos')
+
+#for debug on server
 setwd('/home/bulat/NCI/almanac')
 input <- readRDS(file = '2208_first_100_combos')
 
@@ -156,10 +167,10 @@ Loewe_modded <- function (response.mat, correction = TRUE, Emin = NA, Emax = NA,
           nan.handle = c("L4")) 
 {
   if (correction) {
-    response.mat <- BaselineCorrectionSD2(response.mat, Emin = Emin, 
+    response.mat <- BaselineCorrectionSD(response.mat, Emin = Emin, 
                                          Emax = Emax, nan.handle)$corrected.mat
   }
-  single.fit <- FittingSingleDrug2(response.mat,fixed = c(NA, NA, NA, NA), nan.handle)
+  single.fit <- FittingSingleDrug(response.mat,fixed = c(NA, NA, NA, NA), nan.handle)
   drug.col.model <- single.fit$drug.col.model
   drug.col.par <- coef(drug.col.model)
   d1.fun <- function(conc, drug.col.model) {
@@ -214,10 +225,8 @@ Loewe_modded <- function (response.mat, correction = TRUE, Emin = NA, Emax = NA,
   if( cond1 == F & cond2 == T) eq = eq.L4.LL4
   if( cond1 == F & cond2 == F) eq = eq.L4.L4
   
-  pb <- txtProgressBar(min = 0, max = length(col.conc), style = 3)
 
   for (i in 1:length(col.conc)) {
-	  setTxtProgressBar(pb, i)
     for (j in 1:length(row.conc)) {
       x1 <- col.conc[i]
       x2 <- row.conc[j]
@@ -246,7 +255,6 @@ Loewe_modded <- function (response.mat, correction = TRUE, Emin = NA, Emax = NA,
     }
     
   }
-  close(pb)
 
   return(response.mat - loewe.mat)
 }
@@ -502,7 +510,11 @@ CalculateSynergy <- function (data, method = "ZIP", correction = TRUE, Emin = 0,
   num.pairs <- length(dose.response.mats)
   scores <- list()
   nan.handle <- match.arg(nan.handle)
+  pb <- txtProgressBar(min = 0, max = num.pairs, style = 3)
+  
   for (i in 1:num.pairs) {
+    setTxtProgressBar(pb, i)
+    
     response.mat <- dose.response.mats[[i]]
     scores[[i]] <- switch(method, ZIP = ZIP(response.mat, 
                                             correction, Emin = Emin, Emax = Emax, nan.handle), 
@@ -514,6 +526,8 @@ CalculateSynergy <- function (data, method = "ZIP", correction = TRUE, Emin = 0,
   }
   data$scores <- scores
   data$method <- method
+  close(pb)
+  
   return(data)
 }
 
