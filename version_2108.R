@@ -180,14 +180,43 @@ reshaped <- ReshapeData(unbound_filtered, data.type = 'viability')
 
 
 #this calculates synergy for the full valid 3x3 and 3x5 matrixes of NCI ALMANAC. 307737 dose response mats
+# ZIP, HSA and Bliss were calculated on macosx with the following sessioninfo()
+#########################################################################################################################################################
+#R version 3.4.4 (2018-03-15)
+#Platform: x86_64-apple-darwin15.6.0 (64-bit)
+#Running under: macOS High Sierra 10.13.6
+#
+#Matrix products: default
+#BLAS: /System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libBLAS.dylib
+#LAPACK: /Library/Frameworks/R.framework/Versions/3.4/Resources/lib/libRlapack.dylib
+#
+#locale:
+#  [1] C
+#
+#attached base packages:
+#  [1] stats     graphics  grDevices utils     datasets  methods   base     
+#
+#other attached packages:
+#  [1] synergyfinder_1.4.2 nleqslv_3.3.2       rlist_0.4.6.1       drc_3.0-1           MASS_7.3-50         reshape2_1.4.3      svMisc_1.1.0        prettyR_2.2         bindrcpp_0.2.2     
+#[10] forcats_0.3.0       stringr_1.3.1       dplyr_0.7.5         purrr_0.2.5         readr_1.1.1         tidyr_0.8.1         tibble_1.4.2        ggplot2_2.2.1       tidyverse_1.2.1    
+#
+#loaded via a namespace (and not attached):
+#  [1] httr_1.3.1            maps_3.3.0            jsonlite_1.5          splines_3.4.4         carData_3.0-1         modelr_0.1.2          gtools_3.5.0          assertthat_0.2.0     
+#[9] cellranger_1.1.0      yaml_2.1.19           pillar_1.2.3          lattice_0.20-35       glue_1.2.0            rvest_0.3.2           colorspace_1.3-2      sandwich_2.4-0       
+#[17] Matrix_1.2-14         plyr_1.8.4            psych_1.8.4           pkgconfig_2.0.1       broom_0.4.4           haven_1.1.1           mvtnorm_1.0-8         scales_0.5.0         
+#[25] gdata_2.18.0          openxlsx_4.1.0        rio_0.5.10            car_3.0-0             TH.data_1.0-8         lazyeval_0.2.1        cli_1.0.0             mnormt_1.5-5         
+#[33] survival_2.42-3       magrittr_1.5          crayon_1.3.4          readxl_1.1.0          nlme_3.1-137          gplots_3.0.1          xml2_1.2.0            foreign_0.8-70       
+#[41] tools_3.4.4           SpatialExtremes_2.0-6 data.table_1.11.4     hms_0.4.2             multcomp_1.4-8        gridBase_0.4-7        munsell_0.5.0         plotrix_3.7-2        
+#[49] zip_1.0.0             compiler_3.4.4        caTools_1.17.1        rlang_0.2.1           grid_3.4.4            rstudioapi_0.7        bitops_1.0-6          gtable_0.2.0         
+#[57] codetools_0.2-15      abind_1.4-5           curl_3.2              R6_2.2.2              zoo_1.8-2             lubridate_1.7.4       utf8_1.1.4            bindr_0.1.1          
+#[65] KernSmooth_2.23-15    stringi_1.2.3         parallel_3.4.4        Rcpp_0.12.17          tidyselect_0.2.4    
+#########################################################################################################################################################
+
 
 CalculateSynergy(reshaped, method = "HSA") -> reshaped.HSA
 CalculateSynergy(reshaped, method = "Bliss") -> reshaped.Bliss
-
 CalculateSynergy(reshaped, method = "ZIP", correction = T) -> reshaped.ZIP
-saveRDS(object = reshaped.ZIP, file = 'ZIP')
-CalculateSynergy(reshaped, method = "Loewe", correction = T) -> reshaped.Loewe
-saveRDS(object = reshaped.Loewe, file = 'Loewe')
+#save using saveRDS()
 
 
 # for synergy calc
