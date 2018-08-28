@@ -25,21 +25,21 @@ first.two.Bliss <- list()
 first.two.HSA <- list()
 
 #populate for ZIP
-first.two$dose.response.mats <- reshaped.ZIP$dose.response.mats[c(1:100)]
-first.two$drug.pairs <- reshaped.ZIP$drug.pairs[c(1:100),]
-first.two$scores <- reshaped.ZIP$scores[c(1:100)]
+first.two$dose.response.mats <- reshaped.ZIP$dose.response.mats
+first.two$drug.pairs <- reshaped.ZIP$drug.pairs
+first.two$scores <- reshaped.ZIP$scores
 first.two$method <- reshaped.ZIP$method
 
 #populate for Bliss
-first.two.Bliss$dose.response.mats <- reshaped.Bliss$dose.response.mats[c(1:100)]
-first.two.Bliss$drug.pairs <- reshaped.Bliss$drug.pairs[c(1:100),]
-first.two.Bliss$scores <- reshaped.Bliss$scores[c(1:100)]
+first.two.Bliss$dose.response.mats <- reshaped.Bliss$dose.response.mats
+first.two.Bliss$drug.pairs <- reshaped.Bliss$drug.pairs
+first.two.Bliss$scores <- reshaped.Bliss$scores
 first.two.Bliss$method <- reshaped.Bliss$method
 
 #populate for HSA
-first.two.HSA$dose.response.mats <- reshaped.HSA$dose.response.mats[c(1:100)]
-first.two.HSA$drug.pairs <- reshaped.HSA$drug.pairs[c(1:100),]
-first.two.HSA$scores <- reshaped.HSA$scores[c(1:100)]
+first.two.HSA$dose.response.mats <- reshaped.HSA$dose.response.mats
+first.two.HSA$drug.pairs <- reshaped.HSA$drug.pairs
+first.two.HSA$scores <- reshaped.HSA$scores
 first.two.HSA$method <- reshaped.HSA$method
 
 for (i in 1:nrow(first.two$drug.pairs)) {
@@ -197,5 +197,5 @@ for (i in 1:nrow(first.two$drug.pairs))
 }
 close(pb)
 big_data = do.call(rbind, datalist)
-saveRDS(object = big_data, file = 'big_data')
-saveRDS(object = datalistm file = 'datalist')
+saveRDS(object = big_data, file = 'big_data_no_Loewe')
+saveRDS(object = datalist, file = 'datalist_no_Loewe')
