@@ -3,6 +3,7 @@
 # input is R list of lists, result synergyfinder::ReshapeData()
 # NB: there is error handling added in form of tryCatch for CalculateSynergy. As well as in downstream functions
 # NB1: global options(warn = -1) and options(warn = 0) are set throughout the script.
+# input with full list of valid dose.response.mats and corresponding drugs pairs is 2308_reshaped_finished_4950688
 
 library("tidyverse")
 library('drc')
@@ -13,9 +14,9 @@ library('nleqslv')
 #setwd('/Users/zagidull/Documents/fimm_files/synergy_calc_august/almanac')
 #input <- readRDS(file = '2208_first_100_combos')
 
-#for debug on server
+#for debug and production (lol) on server
 setwd('/home/bulat/NCI/almanac')
-input <- readRDS(file = '2208_first_100_combos')
+input <- readRDS(file = '2308_reshaped_finished_4950688')
 
 
 #original
@@ -694,16 +695,17 @@ ReshapeData <- function (data, data.type = "viability")
   return(list(dose.response.mats = dose.response.mats, drug.pairs = drug.pairs))
 }
 
-
-#CalculateSynergy(input, method = 'ZIP', correction = T, Emin = 0) -> input.ZIP
-#saveRDS(object = input.ZIP, file = 'ZIP')
-
-#CalculateSynergy(input, method = 'HSA', correction = T, Emin = 0) -> input.HSA
-#saveRDS(object = input.HSA, file = 'HSA')
-
 CalculateSynergy(input, method = 'Loewe', correction = T, Emin = 0) -> input.Loewe
-saveRDS(object = input.Loewe, file = 'Loewe')
+saveRDS(object = input.Loewe, file = 'reshaped.Loewe')
 
-#CalculateSynergy(input, method = 'Bliss', correction = T, Emin = 0) -> input.Bliss
-#saveRDS(object = input.Bliss, file = 'Bliss')
+
+CalculateSynergy(input, method = 'ZIP', correction = T, Emin = 0) -> input.ZIP
+saveRDS(object = input.ZIP, file = 'reshaped.ZIP')
+
+CalculateSynergy(input, method = 'HSA', correction = T, Emin = 0) -> input.HSA
+saveRDS(object = input.HSA, file = 'reshaped.HSA')
+
+
+CalculateSynergy(input, method = 'Bliss', correction = T, Emin = 0) -> input.Bliss
+saveRDS(object = input.Bliss, file = 'reshaped.Bliss')
 
