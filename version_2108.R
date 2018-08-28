@@ -216,14 +216,197 @@ reshaped <- ReshapeData(unbound_filtered, data.type = 'viability')
 CalculateSynergy(reshaped, method = "HSA") -> reshaped.HSA
 CalculateSynergy(reshaped, method = "Bliss") -> reshaped.Bliss
 CalculateSynergy(reshaped, method = "ZIP", correction = T) -> reshaped.ZIP
-#save using saveRDS()
+#need saving using saveRDS()
+
+#########################################################################################################################################################
+#prep for loading into the DB
+datalist = list()
+mylist <- list()
+mylist.Bliss <- list()
+mylist.HSA <- list()
+
+first.two <- list()
+first.two.Bliss <- list()
+first.two.HSA <- list()
+
+#populate for ZIP
+first.two$dose.response.mats <- reshaped.ZIP$dose.response.mats[c(1:100)]
+first.two$drug.pairs <- reshaped.ZIP$drug.pairs[c(1:100),]
+first.two$scores <- reshaped.ZIP$scores[c(1:100)]
+first.two$method <- reshaped.ZIP$method
+
+#populate for Bliss
+first.two.Bliss$dose.response.mats <- reshaped.Bliss$dose.response.mats[c(1:100)]
+first.two.Bliss$drug.pairs <- reshaped.Bliss$drug.pairs[c(1:100),]
+first.two.Bliss$scores <- reshaped.Bliss$scores[c(1:100)]
+first.two.Bliss$method <- reshaped.Bliss$method
+
+#populate for HSA
+first.two.HSA$dose.response.mats <- reshaped.HSA$dose.response.mats[c(1:100)]
+first.two.HSA$drug.pairs <- reshaped.HSA$drug.pairs[c(1:100),]
+first.two.HSA$scores <- reshaped.HSA$scores[c(1:100)]
+first.two.HSA$method <- reshaped.HSA$method
+
+for (i in 1:nrow(first.two$drug.pairs)) {
+  mylist[i] <- first.two$drug.pairs[i,]$blockIDs
+}
+
+for (i in 1:nrow(first.two.Bliss$drug.pairs)) {
+  mylist.Bliss[i] <- first.two.Bliss$drug.pairs[i,]$blockIDs
+}
+for (i in 1:nrow(first.two.HSA$drug.pairs)) {
+  mylist.HSA[i] <- first.two.HSA$drug.pairs[i,]$blockIDs
+}
+
+pb <- txtProgressBar(min = 0, max = nrow(first.two$drug.pairs), style = 3)
+
+for (i in 1:nrow(first.two$drug.pairs))
+{
+  setTxtProgressBar(pb, i)
+  a <- list()
+  b <- list()
+  #  c <- list()
+  d <- list()
+  
+  
+  a$dose.response.mats <- first.two$dose.response.mats[i]
+  a$scores <- first.two$scores[i]
+  a$method <- first.two$method
+  a$drug.pairs <- first.two$drug.pairs[i,]
+  
+  if (is.na(a$scores)) {
+    cols <- colnames(a$dose.response.mats[[which(is.na(a$scores))]])
+    rows <- rownames(a$dose.response.mats[[which(is.na(a$scores))]])
+    numrows <- dim(a$dose.response.mats[[which(is.na(a$scores))]])[1]
+    numcols <- dim(a$dose.response.mats[[which(is.na(a$scores))]])[2]
+    a$scores[[which(is.na(a$scores))]] <- matrix(,numrows,numcols,dimnames = list(rows, cols))
+    
+  }
+  
+  b$dose.response.mats <- first.two.Bliss$dose.response.mats[i]
+  b$scores <- first.two.Bliss$scores[i]
+  b$method <- first.two.Bliss$method
+  b$drug.pairs <- first.two.Bliss$drug.pairs[i,]
+  
+  if (is.na(b$scores)) {
+    cols <- colnames(b$dose.response.mats[[which(is.na(b$scores))]])
+    rows <- rownames(b$dose.response.mats[[which(is.na(b$scores))]])
+    numrows <- dim(b$dose.response.mats[[which(is.na(b$scores))]])[1]
+    numcols <- dim(c$dose.response.mats[[which(is.na(b$scores))]])[2]
+    b$scores[[which(is.na(b$scores))]] <- matrix(,numrows,numcols,dimnames = list(rows, cols))
+    
+  }
+  
+  #  c$dose.response.mats <- first.two.L$dose.response.mats[i]
+  #  c$scores <- first.two.L$scores[i]
+  #  c$method <- first.two.L$method
+  #  c$drug.pairs <- first.two.L$drug.pairs[i,]
+  #  
+  #    if (is.na(c$scores)) {
+  #      
+  #    cols <- colnames(c$dose.response.mats[[which(is.na(c$scores))]])
+  #    rows <- rownames(c$dose.response.mats[[which(is.na(c$scores))]])
+  #    numrows <- dim(c$dose.response.mats[[which(is.na(c$scores))]])[1]
+  #    numcols <- dim(c$dose.response.mats[[which(is.na(c$scores))]])[2]
+  #    c$scores[[which(is.na(c$scores))]] <- matrix(,numrows,numcols,dimnames = list(rows, cols))
+  #
+  #  }
+  
+  d$dose.response.mats <- first.two.HSA$dose.response.mats[i]
+  d$scores <- first.two.HSA$scores[i]
+  d$method <- first.two.HSA$method
+  d$drug.pairs <- first.two.HSA$drug.pairs[i,]
+  
+  if (is.na(d$scores)) {
+    cols <- colnames(d$dose.response.mats[[which(is.na(d$scores))]])
+    rows <- rownames(d$dose.response.mats[[which(is.na(d$scores))]])
+    numrows <- dim(d$dose.response.mats[[which(is.na(d$scores))]])[1]
+    numcols <- dim(d$dose.response.mats[[which(is.na(d$scores))]])[2]
+    d$scores[[which(is.na(d$scores))]] <- matrix(,numrows,numcols,dimnames = list(rows, cols))
+    
+  }
+  
+  x.ZIP <- melt(a$dose.response.mats)
+  y.ZIP <- melt(a$scores)
+  xy.ZIP <- merge(x.ZIP,y.ZIP, by = c('Var1', 'Var2', 'L1'))
+  
+  x.Bliss <- melt(b$dose.response.mats)
+  y.Bliss <- melt(b$scores)
+  xy.Bliss <- merge(x.Bliss,y.Bliss, by = c('Var1', 'Var2', 'L1'))
+  
+  #  x.Loewe <- melt(c$dose.response.mats)
+  #  y.Loewe <- melt(c$scores)
+  #  xy.Loewe <- merge(x.Loewe,y.Loewe, by = c('Var1', 'Var2', 'L1'))
+  
+  x.HSA <- melt(d$dose.response.mats)
+  y.HSA <- melt(d$scores)
+  xy.HSA <- merge(x.HSA,y.HSA, by = c('Var1', 'Var2', 'L1'))
+  
+  colnames(xy.ZIP)[which(names(xy.ZIP) == "Var1")] <- "ConcR"
+  colnames(xy.ZIP)[which(names(xy.ZIP) == "Var2")] <- "ConcC"
+  colnames(xy.ZIP)[which(names(xy.ZIP) == "L1")] <- "blockIDs"
+  xy.ZIP$blockIDs <- mylist[[i]]
+  colnames(xy.ZIP)[which(names(xy.ZIP) == "value.x")] <- "Response_inhibition"
+  synergy.type.ZIP <- paste('Synergy', first.two$method, sep = '_')
+  colnames(xy.ZIP)[which(names(xy.ZIP) == "value.y")] <- synergy.type.ZIP
+  
+  colnames(xy.Bliss)[which(names(xy.Bliss) == "Var1")] <- "ConcR"
+  colnames(xy.Bliss)[which(names(xy.Bliss) == "Var2")] <- "ConcC"
+  colnames(xy.Bliss)[which(names(xy.Bliss) == "L1")] <- "blockIDs"
+  xy.Bliss$blockIDs <- mylist.Bliss[[i]]
+  colnames(xy.Bliss)[which(names(xy.Bliss) == "value.x")] <- "Response_inhibition"
+  synergy.type.Bliss <- paste('Synergy', first.two.Bliss$method, sep = '_')
+  colnames(xy.Bliss)[which(names(xy.Bliss) == "value.y")] <- synergy.type.Bliss
+  
+  #  colnames(xy.Loewe)[which(names(xy.Loewe) == "Var1")] <- "ConcR"
+  #  colnames(xy.Loewe)[which(names(xy.Loewe) == "Var2")] <- "ConcC"
+  #  colnames(xy.Loewe)[which(names(xy.Loewe) == "L1")] <- "blockIDs"
+  #  xy.Loewe$blockIDs <- i
+  #  colnames(xy.Loewe)[which(names(xy.Loewe) == "value.x")] <- "Response_inhibition"
+  #  synergy.type.Loewe <- paste('Synergy', first.two.L$method, sep = '_')
+  #  colnames(xy.Loewe)[which(names(xy.Loewe) == "value.y")] <- synergy.type.Loewe
+  
+  colnames(xy.HSA)[which(names(xy.HSA) == "Var1")] <- "ConcR"
+  colnames(xy.HSA)[which(names(xy.HSA) == "Var2")] <- "ConcC"
+  colnames(xy.HSA)[which(names(xy.HSA) == "L1")] <- "blockIDs"
+  xy.HSA$blockIDs <- mylist.HSA[[i]]
+  colnames(xy.HSA)[which(names(xy.HSA) == "value.x")] <- "Response_inhibition"
+  synergy.type.HSA <- paste('Synergy', first.two.HSA$method, sep = '_')
+  colnames(xy.HSA)[which(names(xy.HSA) == "value.y")] <- synergy.type.HSA
+  
+  
+  first.two.no.celllines <- merge(xy.ZIP, a$drug.pairs, by.x=c('blockIDs'), by.y = c('blockIDs'), all.x = T)
+  first.two.no.celllines.Bliss <- merge(xy.Bliss, b$drug.pairs, by.x=c('blockIDs'), by.y = c('blockIDs'), all.x = T)
+  #  first.two.no.celllines.Loewe <- merge(xy.Loewe, c$drug.pairs, by.x=c('blockIDs'), by.y = c('blockIDs'), all.x = T)
+  first.two.no.celllines.HSA <- merge(xy.HSA, d$drug.pairs, by.x=c('blockIDs'), by.y = c('blockIDs'), all.x = T)
+  
+  first.two.no.celllines.ZIP.Bliss <- merge(first.two.no.celllines, first.two.no.celllines.Bliss, 
+                                            by = c('blockIDs','ConcR','ConcC','Response_inhibition',
+                                                   'drug.row', 'drug.col','concRUnit','concCUnit'))
+  first.two.no.celllines.ZIP.Bliss.HSA <- merge(first.two.no.celllines.ZIP.Bliss, first.two.no.celllines.HSA, 
+                                                by = c('blockIDs','ConcR','ConcC','Response_inhibition',
+                                                       'drug.row', 'drug.col','concRUnit','concCUnit'))
+  
+  #  first.two.no.celllines.ZIP.Bliss.Loewe <- merge(first.two.no.celllines.ZIP.Bliss, first.two.no.celllines.Loewe, 
+  #                                          by = c('blockIDs','ConcR','ConcC','Response_inhibition',
+  #                                                 'drug.row', 'drug.col','concRUnit','concCUnit'))
+  #  first.two.no.celllines.ZIP.Bliss.Loewe.HSA <- merge(first.two.no.celllines.ZIP.Bliss.Loewe, first.two.no.celllines.HSA, 
+  #                                          by = c('blockIDs','ConcR','ConcC','Response_inhibition',
+  #                                                 'drug.row', 'drug.col','concRUnit','concCUnit'))
+  
+  
+  
+  #  datalist[[i]] <- first.two.no.celllines.ZIP.Bliss.Loewe.HSA
+  datalist[[i]] <- first.two.no.celllines.ZIP.Bliss.HSA
+  
+}
+close(pb)
+big_data = do.call(rbind, datalist)
+#########################################################################################################################################################
 
 
-# for synergy calc
-#library("drc")
-
-
-
+#for calculating synergy values
+#########################################################################################################################################################
 #it tries to use only LL.4 model for fitting the data. 
 # but d1.fun and d2.fun depend one which model was used to fit: LL.4 vs L.4
 # so we end up having 4 scenarios -> both row and col LL4, both row and col L4, and then row LL4 col L4; row L4 and col LL4
@@ -799,245 +982,3 @@ ReshapeData <- function (data, data.type = "viability")
   drug.pairs$blockIDs <- id.drug.comb
   return(list(dose.response.mats = dose.response.mats, drug.pairs = drug.pairs))
 }
-
-#####
-#some error handling
-# this throws the dim error
-#  3053  750690 in cell line SK-MEL-28
-test <- for_sorting %>%
-  filter(CELLNAME == 'SK-MEL-28')
-x <- test
-y <- 256942
-z <- 256439
-
-
-y <- as.numeric(y)
-z <- as.numeric(z)
-
-x <- filter(x, ((NSC1 == y & NSC2 == z) | (NSC1 == y & is.na(NSC2)) | (NSC1 == z & is.na(NSC2)) ))
-
-x_comb <- list()
-x_comb <- filter(x, ( (NSC1 == y & NSC2 == z) ) )
-x_comb <- x_comb %>%
-  group_by(NSC1, NSC2, CONC1, CONC2) %>%
-  mutate(mean_single = mean(PERCENTGROWTH)) %>% # this gets mean values for all the experiments where one drug is tested by itself in cell line == 786-0
-  arrange()
-
-
-aCONC11 <- unique(filter(x_comb, (!is.na(CONC2))  )$CONC1)
-aNSC11 <- y
-aCONC21 <- unique(filter(x_comb, (!is.na(CONC2))  )$CONC2)
-aNSC21 <-z
-
-x_one <- filter(x, (CONC1 %in% aCONC11)& NSC1 ==aNSC11 & is.na(CONC2))
-x_one <- x_one %>%
-  group_by(CONC1) %>%
-  mutate(mean_single = mean(PERCENTGROWTH)) %>% # this gets mean values for all the experiments where one drug is tested by itself in cell line == 786-0
-  arrange()
-df <- data.frame()
-df <- as.data.frame(cbind(order(aCONC11), aCONC11))
-x_one <- inner_join(x_one, df, by=c("CONCINDEX1" = "V1", "CONC1" = "aCONC11"))
-x_one <- x_one[!duplicated(x_one[c("CONC1")]),]
-
-x_two <- filter(x, (CONC1 %in% aCONC21)& NSC1 ==aNSC21 & is.na(CONC2))
-x_two <- x_two %>%
-  group_by(CONC1) %>%
-  mutate(mean_single = mean(PERCENTGROWTH)) %>% # this gets mean values for all the experiments where one drug is tested by itself in cell line == 786-0
-  arrange()
-df2 <- data.frame()
-df2 <- as.data.frame(cbind(order(aCONC21), aCONC21))
-x_two <- inner_join(x_two, df2, by=c("CONCINDEX1" = "V1", "CONC1" = "aCONC21"))
-x_two <- x_two[!duplicated(x_two[c("CONC1")]),]
-
-x_comb <- rbind(x_comb, x_one)
-x_comb <- rbind(x_comb, x_two)
-
-x <- x_comb
-
-class_old <- list()
-class_old <- sapply(x, class)
-#  print(class_old)
-NSC2_un <- vector(mode="numeric", length=1)
-NSC2_un <- unique(x$NSC2[!is.na(x$NSC2)])
-predicate <- function(x) {
-  if (as.numeric(x[["CONCINDEX2"]]== 0) & as.numeric(x[["NSC1"]]) == NSC2_un) {
-    return(T)
-  }
-  else {return(F)}
-}
-exchange <- function(x) {
-  if (predicate(x)){
-    placeholderIndex <- x[["CONCINDEX1"]]
-    placeholderConc <- x[["CONC1"]]
-    x[["CONCINDEX1"]] <- x[["CONCINDEX2"]]
-    x[["CONCINDEX2"]] <- placeholderIndex
-    x[["CONC1"]] <- x[["CONC2"]]
-    x[["CONC2"]] <- placeholderConc
-    return(x)
-  } else { return(x)}
-} 
-
-x <- as.tibble(t(apply(x, 1, exchange)))
-x[] <- Map(`class<-`,x, class_old) #brilliant! https://stackoverflow.com/questions/27435873/changing-class-of-data-frame-columns-using-strings
-#  class_new <- sapply(x, class)
-#  print(class_new)
-
-
-
-
-NSC1 <- dplyr::setdiff(unique(x$NSC1[!is.na(x$NSC1)]),NSC2_un)
-#  NSC1 <- unique(x$NSC1[!is.na(x$NSC1)])
-x[(nrow(x)+1),] <- x[nrow(x),]
-x[nrow(x),]$NSC1 <- NSC1
-x[nrow(x),]$NSC2 <- NSC2_un
-x[nrow(x),]$CONCINDEX1 <- x[nrow(x),]$CONCINDEX2 <- x[nrow(x),]$CONC1 <- x[nrow(x),]$CONC2 <- 0
-x[nrow(x),]$mean_single <- 100
-x[nrow(x),]$SAMPLE2 <- unique(x$SAMPLE2[!is.na(x$SAMPLE2)])
-
-x$Row <- x$CONCINDEX2 + 1
-x$Col <- x$CONCINDEX1 + 1
-x$BlockID <- c(blockID) # sub with cell-line
-x$Response <- x$mean_single
-x$ConcRowUnit <- x$ConcColUnit <- c("M")
-x$ConcRow <- x$CONC2
-x$ConcCol <- x$CONC1
-x$ConcCol[is.na(x$ConcCol) ] <- 0
-x$DrugRow <- NSC2_un
-x$DrugCol <- NSC1
-x[is.na(x$ConcRow),]$ConcRow <- 0
-#  x <- x[,-c(1:16)] # to-do change that
-x <- x[-match(c("COMBODRUGSEQ","SCREENER","STUDY", "TESTDATE", "PLATE", "PANELNBR", "CELLNBR", "PREFIX1", "NSC1", "SAMPLE1", "CONCINDEX1", "CONC1", "CONCUNIT1", "PREFIX2", "NSC2", "SAMPLE2", "CONCINDEX2", "CONC2", "CONCUNIT2", "PERCENTGROWTH", "PERCENTGROWTHNOTZ","TESTVALUE", "CONTROLVALUE", "TZVALUE", "EXPECTEDGROWTH", "SCORE", "VALID", "PANEL", "CELLNAME", "mean_single"), names(x))]
-return(x)
-
-
-#####
-
-do.call(rbind, datalist_full) -> trying
-do.call(rbind, trying) -> trying
-
-#######################################
-function (data, data.type = "viability") 
-{
-  if (!all(c("BlockID", "DrugRow", "DrugCol", "Row", "Col", 
-             "Response", "ConcRow", "ConcCol", "ConcRowUnit", "ConcColUnit") %in% 
-           colnames(data))) 
-    stop("The input data must contain the following columns: BlockID, DrugRow, DrugCol, Row, Col, Response,\n         ConcRow, ConcCol, ConcRowUnit, ConcColUnit")
-  id.drug.comb <- unique(data$BlockID)
-  dose.response.mats <- list()
-  drug.pairs <- data.frame(drug.row = character(length(id.drug.comb)), 
-                           drug.col = character(length(id.drug.comb)), concRUnit = character(length(id.drug.comb)), 
-                           concCUnit = character(length(id.drug.comb)), blockIDs = numeric(length(id.drug.comb)), 
-                           stringsAsFactors = FALSE)
-  for (i in 1:length(id.drug.comb)) {
-    tmp.mat <- data[which(data$BlockID == id.drug.comb[i]), 
-                    ]
-    if (data.type == "viability") {
-      tmp.mat$Inhibition <- 100 - tmp.mat$Response
-    }
-    else {
-      tmp.mat$Inhibition <- tmp.mat$Response
-    }
-    conc.col <- tmp.mat$ConcCol[which(tmp.mat$Row == 1)]
-    conc.col <- conc.col[order(tmp.mat$Col[which(tmp.mat$Row == 
-                                                   1)])]
-    conc.row <- tmp.mat$ConcRow[which(tmp.mat$Col == 1)]
-    conc.row <- conc.row[order(tmp.mat$Row[which(tmp.mat$Col == 
-                                                   1)])]
-    response.mat <- acast(tmp.mat, Row ~ Col, value.var = "Inhibition")
-    colnames(response.mat) <- conc.col
-    rownames(response.mat) <- conc.row
-    if (which.max(conc.row) == 1 & which.max(conc.col) == 
-        1) {
-      response.mat <- t(apply(apply(response.mat, 2, rev), 
-                              1, rev))
-    }
-    else if (which.max(conc.row) == length(conc.row) & which.max(conc.col) == 
-             1) {
-      response.mat <- t(apply(response.mat, 1, rev))
-    }
-    else if (which.max(conc.row) == 1 & which.max(conc.col) == 
-             length(conc.col)) {
-      response.mat <- apply(response.mat, 2, rev)
-    }
-    conc.runit <- unique(tmp.mat$ConcRowUnit)
-    conc.cunit <- unique(tmp.mat$ConcColUnit)
-    drug.row <- unique(tmp.mat$DrugRow)
-    drug.col <- unique(tmp.mat$DrugCol)
-    drug.pairs$drug.row[i] <- drug.row
-    drug.pairs$drug.col[i] <- drug.col
-    drug.pairs$concRUnit[i] <- conc.runit
-    drug.pairs$concCUnit[i] <- conc.cunit
-    dose.response.mats[[i]] <- response.mat
-  }
-  drug.pairs$blockIDs <- id.drug.comb
-  return(list(dose.response.mats = dose.response.mats, drug.pairs = drug.pairs))
-}
-
-
-
-#######################################  
-testing <- for_sorting %>%
-  filter(CELLNAME == "HCT-116")
-
-y = 681239
-z =  606869
-y = 3053
-z = 750690
-testing <- filter(big, ((DrugCol == y & DrugRow == z) | (DrugCol == y & is.na(DrugRow)) | (DrugRow == z & is.na(DrugCol))  ))
-
-testing1 <- filter(testing, ( (NSC1 == y & NSC2 == z) ) )
-testing1 <- testing1 %>%
-  group_by(NSC1, NSC2, CONC1, CONC2) %>%
-  mutate(mean_single = mean(PERCENTGROWTH)) %>% # this gets mean values for all the experiments where one drug is tested by itself in cell line == 786-0
-  arrange()
-
-aCONC11 <- unique(filter(testing1, (!is.na(CONC2))  )$CONC1)
-aNSC11 <- y #unique(filter(x, (!is.na(CONC2))  )$NSC1)
-aCONC21 <- unique(filter(testing1, (!is.na(CONC2))  )$CONC2)
-aNSC21 <-z
-
-testing2 <- filter(testing, (CONC1 %in% aCONC11)& NSC1 ==aNSC11 & is.na(CONC2))
-testing2 <- testing2 %>%
-  group_by(CONC1) %>%
-  mutate(mean_single = mean(PERCENTGROWTH)) %>% # this gets mean values for all the experiments where one drug is tested by itself in cell line == 786-0
-  arrange()
-df <- as.data.frame(cbind(order(aCONC11), aCONC11))
-inner_join(testing2, df, by=c("CONCINDEX1" = "V1", "CONC1" = "aCONC11")) -> testing6
-testing6 <- testing6[!duplicated(testing6[c("CONC1")]),]
-
-testing3 <- filter(testing, (CONC1 %in% aCONC21)& NSC1 ==aNSC21 & is.na(CONC2))
-testing3 <- testing3 %>%
-  group_by(CONC1) %>%
-  mutate(mean_single = mean(PERCENTGROWTH)) %>% # this gets mean values for all the experiments where one drug is tested by itself in cell line == 786-0
-  arrange()
-df2 <- as.data.frame(cbind(order(aCONC21), aCONC21))
-inner_join(testing3, df2, by=c("CONCINDEX1" = "V1", "CONC1" = "aCONC21")) -> testing7
-testing7 <- testing7[!duplicated(testing7[c("CONC1")]),]
-
-testing1 <- rbind(testing1, testing6)
-testing1 <- rbind(testing1, testing7)
-
-
-rowInsert(testing1, 'test') -> testing7
-
-
-testing <- testing %>%
-  group_by(CONCINDEX1,CONC1, CONC2, NSC1, NSC2) %>%
-  mutate(mean_single = mean(PERCENTGROWTH)) %>% # this gets mean values for all the experiments where one drug is tested by itself in cell line == 786-0
-  arrange()
-
-aCONC1 <- unique(filter(testing, (!is.na(CONC2))  )$CONC1)
-aNSC1 <- y #unique(filter(x, (!is.na(CONC2))  )$NSC1)
-aCONC2 <- unique(filter(testing, (!is.na(CONC2))  )$CONC2)
-aNSC2 <-z
-
-testing <- filter(testing, ( (!is.na(NSC1) & !is.na(NSC2)) | ((CONC1 %in% aCONC1)& NSC1 ==aNSC1) | ((CONC1 %in% aCONC2)&NSC1==aNSC2) )  )
-
-testing <- testing[!duplicated(testing[c("NSC1","NSC2" ,"CONC1", "CONC2", "mean_single")]),]
-
-screenID <- prettyR::Mode(testing$SCREENER)
-
-testing <- filter(testing,SCREENER ==  screenID)
-
-clorafarbine 759857
-bortezomib 681239

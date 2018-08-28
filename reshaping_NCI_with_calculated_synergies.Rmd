@@ -1,0 +1,396 @@
+---
+title: "prep for database input"
+output: html_notebook
+---
+## this is used to transform synergyfinder::CalculateSynergy() results into the format that could be loaded for the DB
+
+## aug 28.08
+get first two of each of the CalculateSynergy output files. For testing purposes. There are three input files.
+NB: first.two.$ without the method means it is "ZIP". Since it is the default for the CalculateSynergy
+```{r}
+#create placeholder lists
+first.two <- list()
+first.two.Bliss <- list()
+first.two.HSA <- list()
+
+#populate for ZIP
+first.two$dose.response.mats <- reshaped.ZIP$dose.response.mats[c(1,2)]
+first.two$drug.pairs <- reshaped.ZIP$drug.pairs[c(1,2),]
+first.two$scores <- reshaped.ZIP$scores[c(1,2)]
+first.two$method <- reshaped.ZIP$method
+
+#populate for Bliss
+first.two.Bliss$dose.response.mats <- reshaped.Bliss$dose.response.mats[c(1,2)]
+first.two.Bliss$drug.pairs <- reshaped.Bliss$drug.pairs[c(1,2),]
+first.two.Bliss$scores <- reshaped.Bliss$scores[c(1,2)]
+first.two.Bliss$method <- reshaped.Bliss$method
+
+#populate for HSA
+first.two.HSA$dose.response.mats <- reshaped.HSA$dose.response.mats[c(1,2)]
+first.two.HSA$drug.pairs <- reshaped.HSA$drug.pairs[c(1,2),]
+first.two.HSA$scores <- reshaped.HSA$scores[c(1,2)]
+first.two.HSA$method <- reshaped.HSA$method
+```
+libraries for melting and joining
+```{r}
+library(reshape2) #cast/melt
+library(tidyverse) #spread/gather
+library(rlist) #list join
+options(error = recover)
+```
+checking the melting for ZIP.Test
+```{r}
+x.ZIP <- melt(first.two$dose.response.mats)
+y.ZIP <- melt(first.two$scores)
+xy.ZIP <- merge(x.ZIP,y.ZIP, by = c('Var1', 'Var2', 'L1'))
+```
+checking the melting for Bliss.Test
+```{r}
+x.Bliss <- melt(first.two.Bliss$dose.response.mats)
+y.Bliss <- melt(first.two.Bliss$scores)
+xy.Bliss <- merge(x.Bliss,y.Bliss, by = c('Var1', 'Var2', 'L1'))
+```
+checking the melting for HSA.Test
+```{r}
+x.HSA <- melt(first.two.HSA$dose.response.mats)
+y.HSA <- melt(first.two.HSA$scores)
+xy.HSA <- merge(x.HSA,y.HSA, by = c('Var1', 'Var2', 'L1'))
+```
+
+creating a dictionary to substitute the values with
+```{r}
+#here comes the problem whereby i right now have a numerical + string blockID
+mylist <- list()
+mylist.Bliss <- list()
+mylist.HSA <- list()
+
+
+for (i in 1:nrow(first.two$drug.pairs)) {
+  mylist[i] <- first.two$drug.pairs[i,]$blockIDs
+}
+
+for (i in 1:nrow(first.two.Bliss$drug.pairs)) {
+  mylist.Bliss[i] <- first.two.Bliss$drug.pairs[i,]$blockIDs
+}
+for (i in 1:nrow(first.two.HSA$drug.pairs)) {
+  mylist.HSA[i] <- first.two.HSA$drug.pairs[i,]$blockIDs
+}
+
+```
+
+general rename for ZIP.Test
+```{r}
+colnames(xy.ZIP)[which(names(xy.ZIP) == "Var1")] <- "ConcR"
+colnames(xy.ZIP)[which(names(xy.ZIP) == "Var2")] <- "ConcC"
+colnames(xy.ZIP)[which(names(xy.ZIP) == "L1")] <- "blockIDs"
+colnames(xy.ZIP)[which(names(xy.ZIP) == "value.x")] <- "Response_inhibition"
+synergy.type.ZIP <- paste('Synergy', first.two$method, sep = '_')
+colnames(xy.ZIP)[which(names(xy.ZIP) == "value.y")] <- synergy.type.ZIP
+```
+general rename for Bliss.Test
+```{r}
+colnames(xy.Bliss)[which(names(xy.Bliss) == "Var1")] <- "ConcR"
+colnames(xy.Bliss)[which(names(xy.Bliss) == "Var2")] <- "ConcC"
+colnames(xy.Bliss)[which(names(xy.Bliss) == "L1")] <- "blockIDs"
+colnames(xy.Bliss)[which(names(xy.Bliss) == "value.x")] <- "Response_inhibition"
+synergy.type.Bliss <- paste('Synergy', first.two.Bliss$method, sep = '_')
+colnames(xy.Bliss)[which(names(xy.Bliss) == "value.y")] <- synergy.type.Bliss
+```
+general rename for HSA.Test
+```{r}
+colnames(xy.HSA)[which(names(xy.HSA) == "Var1")] <- "ConcR"
+colnames(xy.HSA)[which(names(xy.HSA) == "Var2")] <- "ConcC"
+colnames(xy.HSA)[which(names(xy.HSA) == "L1")] <- "blockIDs"
+colnames(xy.HSA)[which(names(xy.HSA) == "value.x")] <- "Response_inhibition"
+synergy.type.HSA <- paste('Synergy', first.two.HSA$method, sep = '_')
+colnames(xy.HSA)[which(names(xy.HSA) == "value.y")] <- synergy.type.HSA
+```
+
+now we need to change purely numerical blockIDs with actual blockIDs
+```{r}
+for (i in 1:nrow(first.two$drug.pairs)) {
+  xy.ZIP$blockIDs[xy.ZIP$blockIDs == i] <- mylist[[i]]
+}
+
+for (i in 1:nrow(first.two.Bliss$drug.pairs)) {
+  xy.Bliss$blockIDs[xy.Bliss$blockIDs == i] <- mylist.Bliss[[i]]
+}
+
+for (i in 1:nrow(first.two.HSA$drug.pairs)) {
+  xy.HSA$blockIDs[xy.HSA$blockIDs == i] <- mylist.HSA[[i]]
+}
+
+
+```
+
+merging drug names.Test
+```{r}
+first.two.no.celllines <- merge(xy.ZIP, first.two$drug.pairs, by.x=c('blockIDs'), by.y = c('blockIDs'), all.x = T)
+first.two.no.celllines.Bliss <- merge(xy.Bliss, first.two.Bliss$drug.pairs, by.x=c('blockIDs'), by.y = c('blockIDs'), all.x = T)
+first.two.no.celllines.HSA <- merge(xy.HSA, first.two.HSA$drug.pairs, by.x=c('blockIDs'), by.y = c('blockIDs'), all.x = T)
+
+
+first.two.no.celllines.ZIP.Bliss <- merge(first.two.no.celllines, first.two.no.celllines.Bliss, 
+                                          by = c('blockIDs','ConcR','ConcC','Response_inhibition',
+                                                 'drug.row', 'drug.col','concRUnit','concCUnit'))
+first.two.no.celllines.ZIP.Bliss.HSA <- merge(first.two.no.celllines.ZIP.Bliss, first.two.no.celllines.HSA, 
+                                          by = c('blockIDs','ConcR','ConcC','Response_inhibition',
+                                                 'drug.row', 'drug.col','concRUnit','concCUnit'))
+
+```
+prep for monstrous loop
+```{r}
+first.two.response <- today.ZIP$dose.response.mats
+first.two.drugs <- today.ZIP$drug.pairs
+first.two.scores <- today.ZIP$scores
+first.two.method <- today.ZIP$method
+first.two <- list()
+first.two$dose.response.mats <- first.two.response
+first.two$scores <- first.two.scores
+first.two$drugs <- first.two.drugs
+first.two$method <- first.two.method
+
+first.two.response.Bliss <- today.Bliss$dose.response.mats
+first.two.drugs.Bliss <- today.Bliss$drug.pairs
+first.two.scores.Bliss <- today.Bliss$scores
+first.two.method.Bliss <- today.Bliss$method
+first.two.Bliss <- list()
+first.two.Bliss$dose.response.mats <- first.two.response.Bliss
+first.two.Bliss$scores <- first.two.scores.Bliss
+first.two.Bliss$drugs <- first.two.drugs.Bliss
+first.two.Bliss$method <- first.two.method.Bliss
+
+first.two.response.L <- today.Loewe$dose.response.mats
+first.two.drugs.L <- today.Loewe$drug.pairs
+first.two.scores.L <- today.Loewe$scores
+first.two.method.L <- today.Loewe$method
+first.two.L <- list()
+first.two.L$dose.response.mats <- first.two.response.L
+first.two.L$scores <- first.two.scores.L
+first.two.L$drugs <- first.two.drugs.L
+first.two.L$method <- first.two.method.L
+
+first.two.response.H <- today.HSA$dose.response.mats
+first.two.drugs.H <- today.HSA$drug.pairs
+first.two.scores.H <- today.HSA$scores
+first.two.method.H <- today.HSA$method
+first.two.H <- list()
+first.two.H$dose.response.mats <- first.two.response.H
+first.two.H$scores <- first.two.scores.H
+first.two.H$drugs <- first.two.drugs.H
+first.two.H$method <- first.two.method.H
+```
+treating NAs (when taking blockID 226).Test
+```{r}
+#colnames(first.two$dose.response.mats[[2]])
+#rownames(first.two$dose.response.mats[[2]])
+#dim(first.two$dose.response.mats[[2]])
+cols <- colnames(first.two$dose.response.mats[[which(is.na(first.two$scores))]])
+rows <- rownames(first.two$dose.response.mats[[which(is.na(first.two$scores))]])
+numrows <- dim(first.two$dose.response.mats[[which(is.na(first.two$scores))]])[1]
+numcols <- dim(first.two$dose.response.mats[[which(is.na(first.two$scores))]])[2]
+
+first.two$scores[[which(is.na(first.two$scores))]] <- matrix(,numrows,numcols,dimnames = list(rows, cols))
+
+
+```
+fuck it, let's do it with loops yo
+```{r}
+datalist = list()
+mylist <- list()
+mylist.Bliss <- list()
+mylist.HSA <- list()
+
+first.two <- list()
+first.two.Bliss <- list()
+first.two.HSA <- list()
+
+#populate for ZIP
+first.two$dose.response.mats <- reshaped.ZIP$dose.response.mats[c(1:100)]
+first.two$drug.pairs <- reshaped.ZIP$drug.pairs[c(1:100),]
+first.two$scores <- reshaped.ZIP$scores[c(1:100)]
+first.two$method <- reshaped.ZIP$method
+
+#populate for Bliss
+first.two.Bliss$dose.response.mats <- reshaped.Bliss$dose.response.mats[c(1:100)]
+first.two.Bliss$drug.pairs <- reshaped.Bliss$drug.pairs[c(1:100),]
+first.two.Bliss$scores <- reshaped.Bliss$scores[c(1:100)]
+first.two.Bliss$method <- reshaped.Bliss$method
+
+#populate for HSA
+first.two.HSA$dose.response.mats <- reshaped.HSA$dose.response.mats[c(1:100)]
+first.two.HSA$drug.pairs <- reshaped.HSA$drug.pairs[c(1:100),]
+first.two.HSA$scores <- reshaped.HSA$scores[c(1:100)]
+first.two.HSA$method <- reshaped.HSA$method
+
+for (i in 1:nrow(first.two$drug.pairs)) {
+  mylist[i] <- first.two$drug.pairs[i,]$blockIDs
+}
+
+for (i in 1:nrow(first.two.Bliss$drug.pairs)) {
+  mylist.Bliss[i] <- first.two.Bliss$drug.pairs[i,]$blockIDs
+}
+for (i in 1:nrow(first.two.HSA$drug.pairs)) {
+  mylist.HSA[i] <- first.two.HSA$drug.pairs[i,]$blockIDs
+}
+
+  pb <- txtProgressBar(min = 0, max = nrow(first.two$drug.pairs), style = 3)
+
+for (i in 1:nrow(first.two$drug.pairs))
+{
+      setTxtProgressBar(pb, i)
+  a <- list()
+  b <- list()
+#  c <- list()
+  d <- list()
+  
+  
+  a$dose.response.mats <- first.two$dose.response.mats[i]
+  a$scores <- first.two$scores[i]
+  a$method <- first.two$method
+  a$drug.pairs <- first.two$drug.pairs[i,]
+  
+    if (is.na(a$scores)) {
+    cols <- colnames(a$dose.response.mats[[which(is.na(a$scores))]])
+    rows <- rownames(a$dose.response.mats[[which(is.na(a$scores))]])
+    numrows <- dim(a$dose.response.mats[[which(is.na(a$scores))]])[1]
+    numcols <- dim(a$dose.response.mats[[which(is.na(a$scores))]])[2]
+    a$scores[[which(is.na(a$scores))]] <- matrix(,numrows,numcols,dimnames = list(rows, cols))
+
+  }
+  
+  b$dose.response.mats <- first.two.Bliss$dose.response.mats[i]
+  b$scores <- first.two.Bliss$scores[i]
+  b$method <- first.two.Bliss$method
+  b$drug.pairs <- first.two.Bliss$drug.pairs[i,]
+  
+    if (is.na(b$scores)) {
+    cols <- colnames(b$dose.response.mats[[which(is.na(b$scores))]])
+    rows <- rownames(b$dose.response.mats[[which(is.na(b$scores))]])
+    numrows <- dim(b$dose.response.mats[[which(is.na(b$scores))]])[1]
+    numcols <- dim(c$dose.response.mats[[which(is.na(b$scores))]])[2]
+    b$scores[[which(is.na(b$scores))]] <- matrix(,numrows,numcols,dimnames = list(rows, cols))
+
+  }
+  
+#  c$dose.response.mats <- first.two.L$dose.response.mats[i]
+#  c$scores <- first.two.L$scores[i]
+#  c$method <- first.two.L$method
+#  c$drug.pairs <- first.two.L$drug.pairs[i,]
+#  
+#    if (is.na(c$scores)) {
+#      
+#    cols <- colnames(c$dose.response.mats[[which(is.na(c$scores))]])
+#    rows <- rownames(c$dose.response.mats[[which(is.na(c$scores))]])
+#    numrows <- dim(c$dose.response.mats[[which(is.na(c$scores))]])[1]
+#    numcols <- dim(c$dose.response.mats[[which(is.na(c$scores))]])[2]
+#    c$scores[[which(is.na(c$scores))]] <- matrix(,numrows,numcols,dimnames = list(rows, cols))
+#
+#  }
+  
+  d$dose.response.mats <- first.two.HSA$dose.response.mats[i]
+  d$scores <- first.two.HSA$scores[i]
+  d$method <- first.two.HSA$method
+  d$drug.pairs <- first.two.HSA$drug.pairs[i,]
+  
+    if (is.na(d$scores)) {
+    cols <- colnames(d$dose.response.mats[[which(is.na(d$scores))]])
+    rows <- rownames(d$dose.response.mats[[which(is.na(d$scores))]])
+    numrows <- dim(d$dose.response.mats[[which(is.na(d$scores))]])[1]
+    numcols <- dim(d$dose.response.mats[[which(is.na(d$scores))]])[2]
+    d$scores[[which(is.na(d$scores))]] <- matrix(,numrows,numcols,dimnames = list(rows, cols))
+
+  }
+
+  x.ZIP <- melt(a$dose.response.mats)
+  y.ZIP <- melt(a$scores)
+  xy.ZIP <- merge(x.ZIP,y.ZIP, by = c('Var1', 'Var2', 'L1'))
+  
+  x.Bliss <- melt(b$dose.response.mats)
+  y.Bliss <- melt(b$scores)
+  xy.Bliss <- merge(x.Bliss,y.Bliss, by = c('Var1', 'Var2', 'L1'))
+  
+#  x.Loewe <- melt(c$dose.response.mats)
+#  y.Loewe <- melt(c$scores)
+#  xy.Loewe <- merge(x.Loewe,y.Loewe, by = c('Var1', 'Var2', 'L1'))
+  
+  x.HSA <- melt(d$dose.response.mats)
+  y.HSA <- melt(d$scores)
+  xy.HSA <- merge(x.HSA,y.HSA, by = c('Var1', 'Var2', 'L1'))
+  
+  colnames(xy.ZIP)[which(names(xy.ZIP) == "Var1")] <- "ConcR"
+  colnames(xy.ZIP)[which(names(xy.ZIP) == "Var2")] <- "ConcC"
+  colnames(xy.ZIP)[which(names(xy.ZIP) == "L1")] <- "blockIDs"
+  xy.ZIP$blockIDs <- mylist[[i]]
+  colnames(xy.ZIP)[which(names(xy.ZIP) == "value.x")] <- "Response_inhibition"
+  synergy.type.ZIP <- paste('Synergy', first.two$method, sep = '_')
+  colnames(xy.ZIP)[which(names(xy.ZIP) == "value.y")] <- synergy.type.ZIP
+  
+  colnames(xy.Bliss)[which(names(xy.Bliss) == "Var1")] <- "ConcR"
+  colnames(xy.Bliss)[which(names(xy.Bliss) == "Var2")] <- "ConcC"
+  colnames(xy.Bliss)[which(names(xy.Bliss) == "L1")] <- "blockIDs"
+  xy.Bliss$blockIDs <- mylist.Bliss[[i]]
+  colnames(xy.Bliss)[which(names(xy.Bliss) == "value.x")] <- "Response_inhibition"
+  synergy.type.Bliss <- paste('Synergy', first.two.Bliss$method, sep = '_')
+  colnames(xy.Bliss)[which(names(xy.Bliss) == "value.y")] <- synergy.type.Bliss
+  
+#  colnames(xy.Loewe)[which(names(xy.Loewe) == "Var1")] <- "ConcR"
+#  colnames(xy.Loewe)[which(names(xy.Loewe) == "Var2")] <- "ConcC"
+#  colnames(xy.Loewe)[which(names(xy.Loewe) == "L1")] <- "blockIDs"
+#  xy.Loewe$blockIDs <- i
+#  colnames(xy.Loewe)[which(names(xy.Loewe) == "value.x")] <- "Response_inhibition"
+#  synergy.type.Loewe <- paste('Synergy', first.two.L$method, sep = '_')
+#  colnames(xy.Loewe)[which(names(xy.Loewe) == "value.y")] <- synergy.type.Loewe
+  
+  colnames(xy.HSA)[which(names(xy.HSA) == "Var1")] <- "ConcR"
+  colnames(xy.HSA)[which(names(xy.HSA) == "Var2")] <- "ConcC"
+  colnames(xy.HSA)[which(names(xy.HSA) == "L1")] <- "blockIDs"
+  xy.HSA$blockIDs <- mylist.HSA[[i]]
+  colnames(xy.HSA)[which(names(xy.HSA) == "value.x")] <- "Response_inhibition"
+  synergy.type.HSA <- paste('Synergy', first.two.HSA$method, sep = '_')
+  colnames(xy.HSA)[which(names(xy.HSA) == "value.y")] <- synergy.type.HSA
+  
+  
+  first.two.no.celllines <- merge(xy.ZIP, a$drug.pairs, by.x=c('blockIDs'), by.y = c('blockIDs'), all.x = T)
+  first.two.no.celllines.Bliss <- merge(xy.Bliss, b$drug.pairs, by.x=c('blockIDs'), by.y = c('blockIDs'), all.x = T)
+#  first.two.no.celllines.Loewe <- merge(xy.Loewe, c$drug.pairs, by.x=c('blockIDs'), by.y = c('blockIDs'), all.x = T)
+  first.two.no.celllines.HSA <- merge(xy.HSA, d$drug.pairs, by.x=c('blockIDs'), by.y = c('blockIDs'), all.x = T)
+  
+  first.two.no.celllines.ZIP.Bliss <- merge(first.two.no.celllines, first.two.no.celllines.Bliss, 
+                                          by = c('blockIDs','ConcR','ConcC','Response_inhibition',
+                                                 'drug.row', 'drug.col','concRUnit','concCUnit'))
+  first.two.no.celllines.ZIP.Bliss.HSA <- merge(first.two.no.celllines.ZIP.Bliss, first.two.no.celllines.HSA, 
+                                          by = c('blockIDs','ConcR','ConcC','Response_inhibition',
+                                                 'drug.row', 'drug.col','concRUnit','concCUnit'))
+  
+#  first.two.no.celllines.ZIP.Bliss.Loewe <- merge(first.two.no.celllines.ZIP.Bliss, first.two.no.celllines.Loewe, 
+#                                          by = c('blockIDs','ConcR','ConcC','Response_inhibition',
+#                                                 'drug.row', 'drug.col','concRUnit','concCUnit'))
+#  first.two.no.celllines.ZIP.Bliss.Loewe.HSA <- merge(first.two.no.celllines.ZIP.Bliss.Loewe, first.two.no.celllines.HSA, 
+#                                          by = c('blockIDs','ConcR','ConcC','Response_inhibition',
+#                                                 'drug.row', 'drug.col','concRUnit','concCUnit'))
+  
+  
+  
+#  datalist[[i]] <- first.two.no.celllines.ZIP.Bliss.Loewe.HSA
+  datalist[[i]] <- first.two.no.celllines.ZIP.Bliss.HSA
+  
+}
+    close(pb)
+big_data = do.call(rbind, datalist)
+```
+
+adding cell lines
+```{r}
+asdf <- input.sample %>%
+  group_by(BlockID) %>%
+    transmute(cell_line) %>%
+      summarise(cell_line = unique(cell_line))
+
+testing <- big_data
+out <- merge(testing, asdf, by.x=c('blockIDs'),by.y=c('BlockID'),all.x = T )
+write.csv(out,file = '~/Documents/fimm_files/synergy_calc_august/output_alls.csv')
+```
+
+
+
