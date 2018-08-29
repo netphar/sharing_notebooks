@@ -552,7 +552,11 @@ CalculateSynergy <- function (data, method = "ZIP", correction = TRUE, Emin = 0,
   num.pairs <- length(dose.response.mats)
   scores <- list()
   nan.handle <- match.arg(nan.handle)
+  
+  pb <- txtProgressBar(min = 0, max = num.pairs, style = 3)
+  
   for (i in 1:num.pairs) {
+    setTxtProgressBar(pb, i)
     response.mat <- dose.response.mats[[i]]
     scores[[i]] <- switch(method, ZIP = ZIP(response.mat, 
                                             correction, Emin = Emin, Emax = Emax, nan.handle), 
@@ -564,6 +568,7 @@ CalculateSynergy <- function (data, method = "ZIP", correction = TRUE, Emin = 0,
   }
   data$scores <- scores
   data$method <- method
+  close(pb)
   return(data)
 }
 
