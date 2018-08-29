@@ -17,7 +17,8 @@ library('nleqslv')
 #for debug and production (lol) on server
 setwd('/home/bulat/NCI/almanac')
 input <- readRDS(file = '2308_reshaped_finished_4950688')
-
+#input$dose.response.mats <- input$dose.response.mats[1]
+#input$drug.pairs <- input$drug.pairs[1,]
 
 Loewe_modded <- function (response.mat, correction = TRUE, Emin = 0, Emax = NA, 
                           nan.handle = c("L4")) 
