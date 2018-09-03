@@ -15,17 +15,17 @@ library('reshape2')
 library('nleqslv')
 
 #for debug on laptop
-setwd('/Users/zagidull/Documents/fimm_files/synergy_calc_august/almanac')
+#setwd('/Users/zagidull/Documents/fimm_files/synergy_calc_august/almanac')
 #input <- readRDS(file = '2208_first_100_combos')
 
 #for debug and production (lol) on server
-#setwd('/home/bulat/NCI/almanac')
+setwd('/home/bulat/NCI/almanac')
 input <- readRDS(file = '2308_reshaped_finished_4950688')
 #input$dose.response.mats <- input$dose.response.mats[1]
 #input$drug.pairs <- input$drug.pairs[1,]
 
-input$dose.response.mats <- input$dose.response.mats[c(1:3)]
-input$drug.pairs <- input$drug.pairs[c(1:3),]
+#input$dose.response.mats <- input$dose.response.mats[c(1:3)]
+#input$drug.pairs <- input$drug.pairs[c(1:3),]
 
 
 #change concetrations from M to uM

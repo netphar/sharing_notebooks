@@ -23,8 +23,8 @@ setwd('/home/bulat/NCI/almanac')
 input <- readRDS(file = '2308_reshaped_finished_4950688')
 
 #used to test:
-input$dose.response.mats <- input$dose.response.mats[c(1:3)]
-input$drug.pairs <- input$drug.pairs[c(1:3),]
+#input$dose.response.mats <- input$dose.response.mats[c(1:3)]
+#input$drug.pairs <- input$drug.pairs[c(1:3),]
 #end of test
 
 #change concetrations from M to uM
