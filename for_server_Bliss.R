@@ -23,8 +23,8 @@ library('nleqslv')
 input <- readRDS(file = '/Users/zagidull/Documents/fimm_files/synergy_calc_august/almanac/2308_reshaped_finished_4950688')
 
 
-input$dose.response.mats <- input$dose.response.mats[c(1:3)]
-input$drug.pairs <- input$drug.pairs[c(1:3),]
+#input$dose.response.mats <- input$dose.response.mats[c(1:3)]
+#input$drug.pairs <- input$drug.pairs[c(1:3),]
 
 
 #change concetrations from M to uM

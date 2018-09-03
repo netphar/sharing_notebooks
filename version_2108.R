@@ -1,4 +1,7 @@
 #housekeeping
+rm(list=ls(all=TRUE))
+
+#libs
 library("tidyverse")
 library('drc')
 library('reshape2') # is it necessary?
@@ -399,7 +402,7 @@ for (i in 1:nrow(first.two$drug.pairs))
   #  datalist[[i]] <- first.two.no.celllines.ZIP.Bliss.Loewe.HSA
   datalist[[i]] <- first.two.no.celllines.ZIP.Bliss.HSA
   
-}
+}na
 close(pb)
 big_data = do.call(rbind, datalist)
 #########################################################################################################################################################
