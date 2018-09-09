@@ -9,10 +9,10 @@ library('nleqslv')
 
 #for debug and production (lol) on server
 setwd('/home/bulat/NCI/almanac')
-reshaped.Bliss <- readRDS(file = '3008_reshaped.Bliss')
-reshaped.ZIP <- readRDS(file = '3008_reshaped.ZIP')
-reshaped.HSA <- readRDS(file = '3008_reshaped.HSA')
-reshaped.Loewe <- readRDS(file = '3008_reshaped.Loewe')
+reshaped.Bliss <- readRDS(file = '0309_reshaped.Bliss')
+reshaped.ZIP <- readRDS(file = '0309_reshaped.ZIP')
+reshaped.HSA <- readRDS(file = '0309_reshaped.HSA')
+reshaped.Loewe <- readRDS(file = '0309_reshaped.Loewe')
 
 
 
@@ -213,5 +213,5 @@ for (i in 1:nrow(first.two$drug.pairs))
 }
 close(pb)
 big_data = do.call(rbind, datalist)
-saveRDS(object = big_data, file = '3008_big_data_with_Loewe')
-saveRDS(object = datalist, file = '3008_datalist_with_Loewe')
+saveRDS(object = big_data, file = '0309_big_data_with_Loewe')
+saveRDS(object = datalist, file = '0309_datalist_with_Loewe')
