@@ -35,15 +35,15 @@ source('FittingSingleDrug.R')
 source('CalculateSynergy.R')
 
 #input file
-file1 <- c('ComboDrugGrowth_Nov2017.csv')
-file <- c('new.csv')
+file <- c('ComboDrugGrowth_Nov2017.csv')
+#file <- c('new.csv')
 
 #reading in the data and correcting col classes
 input.data <- read_csv(file, progress = F) # it is nice to read as tibble, this helps get rid of formatting errors
-input.data.full <- read_csv(file1, progress = F) # it is nice to read as tibble, this helps get rid of formatting errors
+#input.data.full <- read_csv(file1, progress = F) # it is nice to read as tibble, this helps get rid of formatting errors
 
 input.data$TESTDATE <- as.Date(input.data$TESTDATE,"%m/%d/%Y") #correcting DATA col class
-input.data.full$TESTDATE <- as.Date(input.data$TESTDATE,"%m/%d/%Y")
+#input.data.full$TESTDATE <- as.Date(input.data$TESTDATE,"%m/%d/%Y")
 #sapply(temp.for_sorting, class) this checks the class of each of the columns
 input.data -> temp.for_sorting
 
@@ -53,7 +53,11 @@ reshaped.input.datalist <- list()
 #cellnames to be searched for
 temp.cellnames_old <- unique(temp.for_sorting$CELLNAME)
 temp.cellnames <- temp.cellnames_old[-61] #todo check why the last cell line has to be removed
-temp.cellnames <- temp.cellnames_old
+#temp.cellnames <- temp.cellnames_old
+
+#remove rows where PERCENTGROWTHNOTZ is na. 
+# https://stackoverflow.com/questions/4862178/remove-rows-with-all-or-some-nas-missing-values-in-data-frame
+temp.for_sorting[complete.cases(temp.for_sorting[, 21]),] -> temp.for_sorting
 
 #cellnames <- c("HCT-116")
 
