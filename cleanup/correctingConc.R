@@ -11,9 +11,18 @@ correctingConc = function(x,y,z) {
   x_comb <- list()
   x_comb <- dplyr::filter(x, ( (NSC1 == y & NSC2 == z) ) )
   # this groups by column values to calculate the mean percent growth
+  ## There is a problem with NCI assay. They use time-zero in their calculations, which results in their PercentGrowth ranging from -100% to 275%
+  ## so -100% means that 100% cell loss compared with time zero. Calculated using (Ti - Tz)/Tz, when Ti < Tz. 
+  ## If Ti >/= Tz, then we use (Ti-Tz)/(Tnegative_control-Tz). Which is reduction of protein content increase compared with neg control.
+  ## this is a SRB assay, for more info check Vichai & Kirtikara, 2006. Nature protocols
+  ## Since in O'Neil's study and in FIMM we are using CTG (Cree & Andreotti 1997, Toxicology in Vitro). Which is endpoint-based
+  ## so %inh = 1 - %viability. %viability = (Ti - Tpositive_control)/(Tnegative_control - Tpositive_control)
+  ## Ti measurement at endpoint for a given drug combo concentration
+  ## Tz measurment at time zero
+  ## as as a result we are going to use PercentGrowthNoTZ, instead of PercentGrowth
   x_comb <- x_comb %>%
     dplyr::group_by(NSC1, NSC2, CONC1, CONC2) %>%
-      dplyr::mutate(mean_single = mean(PERCENTGROWTH)) %>% 
+      dplyr::mutate(mean_single = mean(PERCENTGROWTHNOTZ)) %>% 
         dplyr::arrange()
   
   
@@ -25,7 +34,7 @@ correctingConc = function(x,y,z) {
   x_one <- filter(x, (CONC1 %in% aCONC11)& NSC1 ==aNSC11 & is.na(CONC2))
   x_one <- x_one %>%
     dplyr::group_by(CONC1) %>%
-      dplyr::mutate(mean_single = mean(PERCENTGROWTH)) %>% 
+      dplyr::mutate(mean_single = mean(PERCENTGROWTHNOTZ)) %>% 
         dplyr::arrange()
   df <- data.frame()
   df <- as.data.frame(cbind(order(aCONC11), aCONC11))
@@ -35,7 +44,7 @@ correctingConc = function(x,y,z) {
   x_two <- dplyr::filter(x, (CONC1 %in% aCONC21)& NSC1 ==aNSC21 & is.na(CONC2))
   x_two <- x_two %>%
     dplyr::group_by(CONC1) %>%
-      dplyr::mutate(mean_single = mean(PERCENTGROWTH)) %>% # this gets mean values for all the experiments where one drug is tested by itself in cell line == 786-0
+      dplyr::mutate(mean_single = mean(PERCENTGROWTHNOTZ)) %>% # this gets mean values for all the experiments where one drug is tested by itself in cell line == 786-0
         dplyr::arrange()
   df2 <- data.frame()
   df2 <- as.data.frame(cbind(order(aCONC21), aCONC21))

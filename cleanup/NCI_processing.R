@@ -52,7 +52,7 @@ reshaped.input.datalist <- list()
 
 #cellnames to be searched for
 temp.cellnames_old <- unique(temp.for_sorting$CELLNAME)
-#cellnames <- cellnames_old[-61] #todo check why the last cell line has to be removed
+temp.cellnames <- temp.cellnames_old[-61] #todo check why the last cell line has to be removed
 temp.cellnames <- temp.cellnames_old
 
 #cellnames <- c("HCT-116")
