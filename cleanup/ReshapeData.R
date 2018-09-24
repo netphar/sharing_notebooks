@@ -10,7 +10,13 @@ ReshapeData = function (data, data.type = "viability")
                            drug.col = character(length(id.drug.comb)), concRUnit = character(length(id.drug.comb)), 
                            concCUnit = character(length(id.drug.comb)), blockIDs = numeric(length(id.drug.comb)), 
                            stringsAsFactors = FALSE)
+  #we need a progress bar. Init'ing it here
+  temp.pb <- txtProgressBar(min = 0, max = length(id.drug.comb), style = 3)
+  
   for (i in 1:length(id.drug.comb)) {
+    #actual progress bar
+    setTxtProgressBar(temp.pb, i)
+    
     tmp.mat <- data[which(data$block_id == id.drug.comb[i]),]
     if (data.type == "viability") {
       tmp.mat$Inhibition <- 100 - tmp.mat$response
@@ -44,6 +50,7 @@ ReshapeData = function (data, data.type = "viability")
     drug.pairs$concCUnit[i] <- conc.cunit
     dose.response.mats[[i]] <- response.mat
   }
+  close(temp.pb)
   drug.pairs$blockIDs <- id.drug.comb
   return(list(dose.response.mats = dose.response.mats, drug.pairs = drug.pairs))
 }
