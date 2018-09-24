@@ -36,14 +36,13 @@ source('CalculateSynergy.R')
 
 #input file
 file <- c('ComboDrugGrowth_Nov2017.csv')
-#file <- c('new.csv')
+# new.csv has 9999 lines? so, for like initial testing
+#file <- c('new.csv') 
 
 #reading in the data and correcting col classes
 input.data <- read_csv(file, progress = F) # it is nice to read as tibble, this helps get rid of formatting errors
-#input.data.full <- read_csv(file1, progress = F) # it is nice to read as tibble, this helps get rid of formatting errors
 
 input.data$TESTDATE <- as.Date(input.data$TESTDATE,"%m/%d/%Y") #correcting DATA col class
-#input.data.full$TESTDATE <- as.Date(input.data$TESTDATE,"%m/%d/%Y")
 #sapply(temp.for_sorting, class) this checks the class of each of the columns
 input.data -> temp.for_sorting
 
@@ -53,13 +52,10 @@ reshaped.input.datalist <- list()
 #cellnames to be searched for
 temp.cellnames_old <- unique(temp.for_sorting$CELLNAME)
 temp.cellnames <- temp.cellnames_old[-61] #todo check why the last cell line has to be removed
-#temp.cellnames <- temp.cellnames_old
 
 #remove rows where PERCENTGROWTHNOTZ is na. 
 # https://stackoverflow.com/questions/4862178/remove-rows-with-all-or-some-nas-missing-values-in-data-frame
 temp.for_sorting[complete.cases(temp.for_sorting[, 21]),] -> temp.for_sorting
-
-#cellnames <- c("HCT-116")
 
 for (temp.name in temp.cellnames) {
   #this creates a place holder for one cellline 
@@ -98,14 +94,15 @@ for (temp.name in temp.cellnames) {
   
 }
 
-#bind all in one and leave only rows with the correct number of columns. So 3x3 + 3 + 3 + 1 or 3x5 + 3 + 5 + 1
+#bind all in one and leave only rows with the correct number of columns. So 3x3 + 3 + 3 + 1 = 16 or 3x5 + 3 + 5 + 1 = 24
 do.call(rbind, do.call(rbind, reshaped.input.datalist)) -> temp.unbound
 temp.unbound.filtered <- temp.unbound %>%
   dplyr::group_by(BlockID) %>%
     dplyr::mutate(nrows = n()) %>%
       dplyr::filter(nrows == 16 | nrows == 24)
 
-#rename colnames
+#renames colnames
+##tracemem says that by renaming columns we make it a completely new object. Which means copying over
 ##tracemem(unbound_filtered) -> before
 names(temp.unbound.filtered) <- c('row', 'col', 'block_id', 'response', 'conc_c_unit', 'conc_r_unit', 'conc_r', 'conc_c', 'drug_row', 'drug_col', 'nrows')
 ##tracemem(unbound_filtered) -> after
@@ -120,6 +117,13 @@ reshaped$dose.response.mats <- lapply(reshaped$dose.response.mats, function(x) {
   return(x)
 })
 reshaped$drug.pairs$concRUnit <- reshaped$drug.pairs$concCUnit <- 'uM'
+
+# the idea is to wrap CalculateSynergy and do the reshape for DB as a function. Ideally, as a function that should could be parallelized.
+# could be either screen or via parallel R package
+#temp.methods <- c('ZIP','Loewe','Bliss','HSA')
+#for (temp.method in temp.methods){
+#  CalculateSynergy(reshaped, method = temp.method, correction = T, Emin = 0, Emax = NA)
+#}
 
 CalculateSynergy(reshaped, method = 'ZIP', correction = T, Emin = 0, Emax = NA) -> reshaped.ZIP
 CalculateSynergy(reshaped, method = 'Loewe', correction = T, Emin = 0, Emax = NA) -> reshaped.Loewe
