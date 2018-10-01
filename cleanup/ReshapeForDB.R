@@ -1,4 +1,7 @@
-ReshapeForDB = function(x) {  
+ReshapeForDB = function(x, y) {  
+  # x is output of CalculateSynergy file. It is a list of lists, with dose.response.mats, scores, method, drug.pairs
+  # y is the name of the Synergy method used for calculating the input file. In format SynergyHSA/ZIP/Bliss/Loewe
+  
   # init number of iterations needed, find which blockID's have NA as synergy score and create a nested list of length iter to store results
   iter <- c(1:nrow(x$drug.pairs))
   to.populate <- which(is.na(x$scores))
@@ -33,7 +36,7 @@ ReshapeForDB = function(x) {
     nrows <- nrow(temp)
     
     # adjust names and add drug row/col and blockID's
-    names(temp) <- c('ConcR','ConcC','ResponseInhibition', 'SynergyHSA')
+    names(temp) <- c('ConcR','ConcC','ResponseInhibition', y)
     temp$BlockID <- rep(temp.info$blockIDs, times = nrows)
     #    temp$DrugRow <- rep(temp.info$drug.row, times = times)
     #    temp$DrugCol <- rep(temp.info$drug.col, times = times)
