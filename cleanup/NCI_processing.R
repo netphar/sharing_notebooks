@@ -6,7 +6,7 @@
 # version 0.51
 
 #working dir laptop
-setwd('/Users/zagidull/Desktop/synergy_calc_august/cleanup')
+setwd('/Users/zagidull/Documents/git/sharing_notebooks/cleanup')
 #working dir server
 #setwd('/Users/zagidull/Desktop/synergy_calc_august/cleanup')
 
@@ -64,8 +64,8 @@ temp.cellnames_old <- unique(temp.for_sorting$CELLNAME)
 temp.cellnames <- temp.cellnames_old[-61] #todo check why the last cell line has to be removed
 
 # random sampling of cell lines
- set.seed(1)
- temp.cellnames <- sample(temp.cellnames, 3, replace = F)
+# set.seed(1)
+# temp.cellnames <- sample(temp.cellnames, 3, replace = F)
 
 # there are 208605 rows where PERCENTINHIBITIONNOTZ is NA
 # Substitute PERCENTGROWTHNOTZ with PERCENTGROWTH, when PERCENTGROWTHNOTZ == NA
@@ -129,8 +129,8 @@ for (temp.name in temp.cellnames) {
     na.omit()
   
   # for now checking with a randomly selected set of drug combos
-   set.seed(1)
-   temp.uniqueDrug1Drub2Combos <- temp.uniqueDrug1Drub2Combos[sample(nrow(temp.uniqueDrug1Drub2Combos), 5),]
+  # set.seed(1)
+  # temp.uniqueDrug1Drub2Combos <- temp.uniqueDrug1Drub2Combos[sample(nrow(temp.uniqueDrug1Drub2Combos), 5),]
   
   for (temp.i in 1:nrow(temp.uniqueDrug1Drub2Combos)) {
     temp.perrow <- list()
@@ -235,7 +235,11 @@ names(temp.out) -> temp.names.old
 temp.data <- temp.out
 names(temp.data) <- c('conc_r','conc_c','response','block_id','drug_row','drug_col','conc_c_unit',"conc_r_unit",'ZIP','Loewe', 'HSA', 'Bliss')
 
-setwd('/Users/zagidull/Desktop/synergy_calc_august/cleanup/code (1)')
+# laptop
+setwd('/Users/zagidull/Documents/git/sharing_notebooks/cleanup/code (1)')
+# server
+
+
 library(openxlsx)
 library(plyr)
 library(reshape2)

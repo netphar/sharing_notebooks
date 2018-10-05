@@ -1,3 +1,7 @@
+#working dir server
+setwd('/home/bulat/NCI/cleanup')
+
+
 #housekeeping
 rm(list=ls(all=TRUE))
 
@@ -21,10 +25,14 @@ source('Loewe.R')
 source('BaselineCorrectionSD2.R')
 source('FittingSingleDrug.R')
 source('CalculateSynergy.R')
+source('ReshapeForDB.R')
+source('ggplotRegression.R')
 
-setwd('/home/bulat/NCI/cleanup')
 file <- '2609_reshaped'
 reshaped <- readRDS(file)
 
-CalculateSynergy(reshaped, method = 'Loewe', correction = T, Emin = 0, Emax = NA) -> reshaped.Loewe
-saveRDS(object = reshaped.Loewe, file = '2609_reshaped.Loewe')
+CalculateSynergy(temp.reshaped, method = 'Loewe', correction = T, Emin = 0, Emax = NA) -> temp.reshaped.Loewe
+
+
+# saving after reshape
+saveRDS(object = temp.reshaped.Loewe, file = paste0(format(Sys.Date(), "%m_%d_%Y_"), "reshaped_Loewe"))
