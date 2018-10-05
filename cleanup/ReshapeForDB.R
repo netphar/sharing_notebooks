@@ -17,14 +17,15 @@ ReshapeForDB = function(x, y) {
     # precalc values of the drug.pairs. Useful if we need to add drug.row and drug.col. Otherwise probably unnecessary
     temp.info <- x$drug.pairs[i,]
     
-    # get dose-response values in long
+    # get dose-response values in long matrix format
     temp.dose <- reshape2::melt(x$dose.response.mats[[i]])
     
     # get synergy scores in long
     # if score is NA, reconstruct a matrix with the same dimension as dose.response.mats filled with NA's
     if (i %in% to.populate) {
-      temp.scores <- reshape2::melt(matrix(, nrow = nrow(x$dose.response.mats[[i]]), ncol = ncol(x$dose.response.mats[[i]]), 
-                                 dimnames = dimnames(x$dose.response.mats[[i]])))
+      temp.scores <- reshape2::melt(matrix(, nrow = nrow(x$dose.response.mats[[i]]), 
+                                           ncol = ncol(x$dose.response.mats[[i]]), 
+                                           dimnames = dimnames(x$dose.response.mats[[i]])))
     } else {
       temp.scores <- reshape2::melt(x$scores[[i]])
     }
@@ -38,10 +39,13 @@ ReshapeForDB = function(x, y) {
     # adjust names and add drug row/col and blockID's
     names(temp) <- c('ConcR','ConcC','ResponseInhibition', y)
     temp$BlockID <- rep(temp.info$blockIDs, times = nrows)
-    #    temp$DrugRow <- rep(temp.info$drug.row, times = times)
-    #    temp$DrugCol <- rep(temp.info$drug.col, times = times)
+    temp$DrugRow <- rep(temp.info$drug.row, times = nrows)
+    temp$DrugCol <- rep(temp.info$drug.col, times = nrows)
+    temp$DrugColUnit <- rep(temp.info$concCUnit, times = nrows)
+    temp$DrugRowUnit <- rep(temp.info$concRUnit, times = nrows)   
     calculated.synergy.datalist[[i]] <- temp
     
+    # put smoothing.R here?
   }
   close(temp.pb)
   return(calculated.synergy.datalist)
