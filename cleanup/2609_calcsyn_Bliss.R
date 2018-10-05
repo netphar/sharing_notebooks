@@ -1,5 +1,6 @@
 #working dir server
 setwd('/home/bulat/NCI/cleanup')
+options(show.error.messages = F)
 
 
 #housekeeping

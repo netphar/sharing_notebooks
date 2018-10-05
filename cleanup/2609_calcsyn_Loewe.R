@@ -4,6 +4,7 @@ setwd('/home/bulat/NCI/cleanup')
 
 #housekeeping
 rm(list=ls(all=TRUE))
+options(show.error.messages = F)
 
 #required libraries
 library("dplyr")
