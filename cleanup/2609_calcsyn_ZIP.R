@@ -29,8 +29,8 @@ source('CalculateSynergy.R')
 source('ReshapeForDB.R')
 source('ggplotRegression.R')
 
-file <- '2609_reshaped'
-reshaped <- readRDS(file)
+file <- '10_06_2018_reshaped'
+temp.reshaped <- readRDS(file)
 
 CalculateSynergy(temp.reshaped, method = 'ZIP', correction = T, Emin = 0, Emax = NA) -> temp.reshaped.ZIP
 
