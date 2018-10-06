@@ -1,6 +1,5 @@
 #working dir server
 setwd('/home/bulat/NCI/cleanup')
-options(show.error.messages = F)
 
 
 #housekeeping
@@ -27,12 +26,12 @@ source('BaselineCorrectionSD2.R')
 source('FittingSingleDrug.R')
 source('CalculateSynergy.R')
 source('ReshapeForDB.R')
-source('ggplotRegression.R')
 
 file <- '10_06_2018_reshaped'
-temp.eshaped <- readRDS(file)
+temp.reshaped <- readRDS(file)
 
 
+options(show.error.messages = F)
 CalculateSynergy(temp.reshaped, method = 'Bliss', correction = T, Emin = 0) -> temp.reshaped.Bliss
 
 saveRDS(object = temp.reshaped.Bliss, file = paste0(format(Sys.Date(), "%m_%d_%Y_"), "reshaped_Bliss"))
